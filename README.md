@@ -9,6 +9,6 @@ _Spring 2025 (Analysis)_: Run long-term group assays; finalize data analysis and
 
 ## Fall 2025 Plan
 
-![](/home/drosophila-lab/Documents/Cameras-Calit2IRT/src/2D_Prototype/Noodling/plate_d1_written.mp4)
+[![](/home/drosophila-lab/Documents/Cameras-Calit2IRT/src/2D_Prototype/Noodling/plate_d1_written.mp4)]
 
 
