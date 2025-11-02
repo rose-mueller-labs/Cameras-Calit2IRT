@@ -8,7 +8,9 @@ _Winter 2025 (3D setup)_: Have a 3D camera setup working, track multiple flies; 
 _Spring 2025 (Analysis)_: Run long-term group assays; finalize data analysis and presentation.
 
 ## Fall 2025 Plan
+- Made a recording based on sample `plate_d1.mp4` that detects some of the flies using KNN BackgroundSubtractor.
 
-[![](/home/drosophila-lab/Documents/Cameras-Calit2IRT/src/2D_Prototype/Noodling/plate_d1_written.mp4)]
+To-do:
+- Impose a grid and collect coordinates of movement for each unique fly.
 
 
