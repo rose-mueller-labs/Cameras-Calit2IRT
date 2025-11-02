@@ -17,7 +17,7 @@ frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fps = int(cap.get(cv2.CAP_PROP_FPS))
 
 # 2. Define the codec and create VideoWriter object
-output_path = 'plate_d1_written_hgh_min_cntr.mp4'  # Replace with your desired output file name
+output_path = 'plate_d1_written.mp4'  # Replace with your desired output file name
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for .mp4 files (e.g., 'XVID' for .avi)
 out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
@@ -57,7 +57,7 @@ else:
       # Apply erosion
       mask_eroded = cv2.morphologyEx(mask_thresh, cv2.MORPH_OPEN, kernel)
 
-      min_contour_area = 25  # Define your minimum area threshold
+      min_contour_area = 10  # Define your minimum area threshold
       large_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_area]
       # print(large_contours)
       # frame_out = frame.copy()

@@ -1,2 +1,4 @@
 1. Noodle with prev video and test out different algorithms, see what happens
 what are some simple detection algorithms?
+
+![](/home/drosophila-lab/Documents/Cameras-Calit2IRT/src/2D_Prototype/Noodling/plate_d1_written.mp4)
