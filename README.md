@@ -11,6 +11,9 @@ _Spring 2025 (Analysis)_: Run long-term group assays; finalize data analysis and
 - Made a recording based on sample `plate_d1.mp4` that detects some of the flies using KNN BackgroundSubtractor.
 
 To-do:
-- Impose a grid and collect coordinates of movement for each unique fly.
+1. Issue #1
+2. Issue #2
+3. Issue #3
+4. Issue #4
 
 
