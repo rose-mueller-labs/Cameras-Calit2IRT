@@ -28,7 +28,7 @@ frames = read_video(path)
 backSub = createBackgroundSubtractorKNN()
 fly_predictions_prev = dict(key: coordinate, value: fly_id)
 while frames:
-   frame = cap.read()
+   frame = frames.read()
    fg_mask = backSub.apply(frame) # apply background subtractor
    contours = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
    frame_contoured = draw_contours(frame, contours) # draw contours that are tightly bounded and leave space between flies near each other
