@@ -23,7 +23,7 @@ _Spring 2025 (Analysis)_: Run long-term group assays; finalize data analysis and
 7. Go onto next iteration of frame.
 
 PS
-`
+```
 frames = read_video(path)
 backSub = createBackgroundSubtractorKNN()
 fly_predictions_prev = dict(key: coordinate, value: fly_id)
@@ -48,7 +48,7 @@ while frames:
    fly_predictions_prev = fly_prediction # because our current frame will become the previous frame later on
 
 release resources
-`
+```
    
 
 
