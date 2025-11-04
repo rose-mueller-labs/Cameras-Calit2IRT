@@ -44,7 +44,7 @@ while frames:
       fly_id, frame = fly_predictions_prev[coordinate] # or coordinate that is closest to it
       # write the fly_id and coordinate into csv's df[frame][fly_id]
       predicted_coordinate = get_next_coordinate(x, y, ...) # method of getting where the fly will go next
-      fly_prediction[coordinate] = fly_id
+      fly_prediction[predicted_coordinate] = fly_id
    fly_predictions_prev = fly_prediction # because our current frame will become the previous frame later on
 
 release resources
