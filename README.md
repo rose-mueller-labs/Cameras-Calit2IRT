@@ -10,7 +10,7 @@ _Spring 2025 (Analysis)_: Run long-term group assays; finalize data analysis and
 ## Fall 2025 Plan
 - Made a recording based on sample `plate_d1.mp4` that detects some of the flies using KNN BackgroundSubtractor.
 
-### 2D Algorithm Plan:
+### 2D Algorithm Plan
 1. Fix the `[50] frame_ct = cv2.drawContours(frame, contours, -1, (0, 255, 0), 2)` so that the countours can be differentiated at the later step. Each fly's contours draw should NOT be touching so that flies can be differentiated at the bounding step.
 2. Change `[67] frame = cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 200), 3)` to drawing a tightly bounded ellipse around the fly instead.
 3. Extract coordinates of the detected fly and compare to previous prediction in last iteration of frame to get fly ID
