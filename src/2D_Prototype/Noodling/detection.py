@@ -4,9 +4,11 @@ import numpy as np
 import matplotlib
 matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
+import csv
+import os
 # import time
 
-name = "plate_d1"
+name = "vial_closeup"
 vid_path=f"SampleVideos/{name}.mp4"
 # print(cv2.getBuildInformation())
 cap = cv2.VideoCapture(vid_path)
@@ -22,6 +24,14 @@ output_path = f'{name}_written.mp4'  # Replace with your desired output file nam
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for .mp4 files (e.g., 'XVID' for .avi)
 out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
+# 3. open the csv file which will contain coors (intermediate)
+# |timestamp | timestamp ...
+# -----------------------...
+# |bb coor   | bb coor   ...
+# -----------------------...
+# with open(f"{name}_written_coordinates.csv", "w", newline='') as file:
+#         writer = csv.writer(file)
+#         writer.writerow(['Timestamp{i}' * len()])
 
 subtractor_name=""
 backSub = cv2.createBackgroundSubtractorKNN() # cv2.createBackgroundSubtractorMOG2()
@@ -65,6 +75,8 @@ else:
       for cnt in large_contours:
           x, y, w, h = cv2.boundingRect(cnt)
           frame = cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 200), 3)
+          # dims = (x, y), (x+w, y+h)
+
       out.write(frame)
       # Display the resulting frame
       # frame_out.write(frame)

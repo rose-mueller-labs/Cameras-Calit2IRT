@@ -1,3 +1,3 @@
 #!/bin/bash
 
-ffmpeg -i SampleVideos/vial_d5.mov SampleVideos/vial_d5.mp4
+ffmpeg -i SampleVideos/vial_closeup.mov SampleVideos/vial_closeup.mp4
