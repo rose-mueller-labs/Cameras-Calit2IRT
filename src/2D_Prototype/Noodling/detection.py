@@ -1,12 +1,11 @@
 import cv2
-import gradio as gr
 import numpy as np
 import matplotlib
 matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 # import time
 
-vid_path="/home/drosophila-lab/Documents/Cameras-Calit2IRT/src/2D_Prototype/Noodling/SampleVideos/plate_d1.mp4"
+vid_path="SampleVideos/plate_d1.mp4"
 # print(cv2.getBuildInformation())
 cap = cv2.VideoCapture(vid_path)
 
@@ -17,7 +16,7 @@ frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fps = int(cap.get(cv2.CAP_PROP_FPS))
 
 # 2. Define the codec and create VideoWriter object
-output_path = 'plate_d1_written.mp4'  # Replace with your desired output file name
+output_path = 'plate_d1_written_shreya.mp4'  # Replace with your desired output file name
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for .mp4 files (e.g., 'XVID' for .avi)
 out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
@@ -71,5 +70,5 @@ else:
 # cv2.imshow('Vid', frame)
 cv2.waitKey()
 cap.release()
-# out.release() # Uncomment if using VideoWriter
+out.release() # Uncomment if using VideoWriter
 cv2.destroyAllWindows()
