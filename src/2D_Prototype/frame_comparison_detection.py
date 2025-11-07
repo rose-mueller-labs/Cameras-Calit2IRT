@@ -1,3 +1,24 @@
+'''
+The detection algorithm that maintains fly IDs over the video (shown as colors)
+by calculating the Euclidean distance between measuring the distance between
+the previous frames' bounded boxes and current frames'. The boxes with the 
+closest distance are assumed to be the same fly.
+Testing Notes:
+- Works well for few number of flies
+- When a fly stops moving and then starts moving again, it is given a new ID
+- Overlap of when flies brush each other and their bounding boxes overlap
+lead to:
+    (a) New fly detected, new ID
+    (b) ID gets swapped between the brushing flies
+
+Testing Solutions:
+- This is likely a middle step the future, and is used for an entire good
+algorithm
+- CSV file to see previous coordaintes
+- Fix the countours to be tigher and bounding boxes to have the same
+characteristic
+'''
+
 import cv2
 import gradio as gr
 import numpy as np
@@ -100,25 +121,25 @@ else:
             if len(current_bboxes) == 0:
                 break
                 
-            min_dist = float('inf')
-            best_match_idx = -1
+            min_dist = 100000000000000000000000000000000000000000000000000000
+            best_match_i = -1
             
-            for idx, curr_bbox in enumerate(current_bboxes):
-                if idx in used_current:
+            for i, curr_bbox in enumerate(current_bboxes):
+                if i in used_current:
                     continue
                 dist = calculate_distance(prev_bbox, curr_bbox)
                 if dist < min_dist:
                     min_dist = dist
-                    best_match_idx = idx
+                    best_match_i = i
             
             # Assign match if found and distance is reasonable
-            if best_match_idx != -1 and min_dist < 100:  # Distance threshold
-                new_tracked_objects[obj_id] = current_bboxes[best_match_idx]
-                used_current.add(best_match_idx)
+            if best_match_i != -1 and min_dist < 100:  # Distance threshold
+                new_tracked_objects[obj_id] = current_bboxes[best_match_i]
+                used_current.add(best_match_i)
         
         # Assign new IDs to unmatched flies
-        for idx, curr_bbox in enumerate(current_bboxes):
-            if idx not in used_current:
+        for i, curr_bbox in enumerate(current_bboxes):
+            if i not in used_current:
                 new_tracked_objects[next_object_id] = curr_bbox
                 next_object_id += 1
         
