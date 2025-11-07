@@ -43,7 +43,7 @@ def get_unique_color(obj_id):
                 (255, 0, 0),
                 (0, 255, 0)
             ]
-        colors[obj_id] = blug[obj_id % 5]
+        colors[obj_id] = blug[obj_id % 2]
     return colors[obj_id]
 
 if not cap.isOpened():
