@@ -14,7 +14,7 @@ lead to:
 Testing Solutions:
 - This is likely a middle step the future, and is used for an entire good
 algorithm
-- CSV file to see previous coordaintes
+- CSV file to see previous coordinates
 - Fix the countours to be tigher and bounding boxes to have the same
 characteristic
 '''
