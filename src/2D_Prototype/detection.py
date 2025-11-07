@@ -6,9 +6,12 @@ matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 import csv
 import os
+print(cv2.getBuildInformation())
 
-name = "vial_closeup"
-vid_path = f"SampleVideos/{name}.mp4"
+
+name = "plate_d1"
+# vid_path = f"SampleVideos/{name}.mp4"
+vid_path = f"plate_d1.mp4"
 cap = cv2.VideoCapture(vid_path)
 
 # Get video properties
@@ -25,8 +28,8 @@ prev_frame = None
 
 # Object tracking variables
 next_object_id = 0
-tracked_objects = {}  # Maps object_id to (x, y, w, h)
-colors = {}  # Maps object_id to color
+tracked_objects = {}  # key = object_id and value = (x, y, w, h)
+colors = {}  # key = object_id and value = color
 
 def get_center(bbox):
     x, y, w, h = bbox
@@ -41,9 +44,18 @@ def get_unique_color(obj_id):
     if obj_id not in colors:
         blug = [
                 (255, 0, 0),
-                (0, 255, 0)
+                (0, 255, 0),
+                (77,166,255),
+                (179,0,149),
+                (179,0,30),
+                (255,255,77),
+                (191,0,230),
+                (85,102,0),
+                (0,204,204),
+                (0, 0, 255),
+                (0, 0, 0),
             ]
-        colors[obj_id] = blug[obj_id % 5]
+        colors[obj_id] = blug[obj_id % 11]
     return colors[obj_id]
 
 if not cap.isOpened():
@@ -55,7 +67,7 @@ else:
     # Initialize first frame objects
     fg_mask = backSub.apply(frame1)
     contours, hierarchy = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    min_contour_area = 10
+    min_contour_area = 25
     large_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_area]
     
     # Assign IDs to objects in first frame
@@ -74,7 +86,7 @@ else:
         prev_frame = frame2
         fg_mask = backSub.apply(frame2)
         
-        # Threshold and morphological operations
+        # Threshold and erosion
         retval, mask_thresh = cv2.threshold(fg_mask, 127, 255, cv2.THRESH_BINARY)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         mask_eroded = cv2.morphologyEx(mask_thresh, cv2.MORPH_OPEN, kernel)
@@ -128,6 +140,7 @@ else:
             # Draw ID label
             cv2.putText(frame2, f'ID:{obj_id}', (x, y-10), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            # Write into CSV file here, do post-processing using the CSV file
         
         cv2.imwrite('frame1.jpg', frame1)
         cv2.imwrite('frame2.jpg', frame2)
