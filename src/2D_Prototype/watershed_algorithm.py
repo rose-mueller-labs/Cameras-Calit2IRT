@@ -64,7 +64,7 @@ def apply_watershed_segmentation(fg_mask, original_frame):
     dist_transform = cv2.distanceTransform(opening, cv2.DIST_L2, 5)
     
     # Step 4: Threshold to get sure foreground
-    # Using 0.5 * max distance as threshold (adjustable: 0.3-0.7)
+    # Using 0.5 * max distance as threshold
     ret, sure_fg = cv2.threshold(dist_transform, 0.5 * dist_transform.max(), 255, 0)
     sure_fg = np.uint8(sure_fg)
     
@@ -206,9 +206,8 @@ else:
         
         out.write(frame2)
         
-        # Progress indicator
-        if frame_count % 30 == 0:
-            print(f"@ {frame_count} frames with {len(tracked_objects)} flies")
+        # if frame_count % 30 == 0:
+        #     print(f"@ {frame_count} frames with {len(tracked_objects)} flies")
 
 cap.release()
 out.release()
