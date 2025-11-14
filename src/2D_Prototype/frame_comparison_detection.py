@@ -81,7 +81,8 @@ else:
     fg_mask = backSub.apply(frame1)
     contours, hierarchy = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     min_contour_area = 30
-    large_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_area]
+    max_contour_area = 500
+    large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
     
     # Assign IDs to objects in first frame
     for cnt in large_contours:
