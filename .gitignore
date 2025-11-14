@@ -1,2 +1,5 @@
 src/2D_Prototype/SampleVideos
 .DS_Store
+.venv
+../../.DS_Store
+../.DS_Store

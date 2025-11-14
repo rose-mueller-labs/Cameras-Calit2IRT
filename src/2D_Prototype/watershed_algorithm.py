@@ -1,17 +1,18 @@
 '''
+Tutorial used:
 https://www.geeksforgeeks.org/computer-vision/image-segmentation-with-watershed-algorithm-opencv-python/
+
+Issues found:
+- Flies being redected after inactivity as new flies
+- Flies sometimes being changed into new ID flies for seemingly no reason, why is that happening
 '''
+
 
 import cv2
 import numpy as np
 import random
 
-for name in ["plate_d1", "vial_closeup", "vial_d2", "vial_d3", "vial_d5"]:
-    # name = "plate_d1"
-    # name = "vial_closeup"
-    # name="vial_d2"
-    # name="vial_d3"
-    # name="vial_d5"
+for name, min_contour_area in [("plate_d1", 15), ("vial_closeup", 10), ("vial_d3", 10), ("vial_d2", 10), ("vial_d5", 10)]:
     vid_path = f"SampleVideos/{name}.mp4"
     cap = cv2.VideoCapture(vid_path)
 
@@ -47,6 +48,9 @@ for name in ["plate_d1", "vial_closeup", "vial_d2", "vial_d3", "vial_d5"]:
             if (r, g, b) not in colors.values():
                 colors[obj_id] = (r, g, b)
             else:
+                r = random.randint(0, 255)
+                g = random.randint(0, 255)
+                b = random.randint(0, 255)
                 colors[obj_id] = (r, g, b)
         return colors[obj_id]
 
@@ -115,7 +119,7 @@ for name in ["plate_d1", "vial_closeup", "vial_d2", "vial_d3", "vial_d5"]:
         return contours_list
 
     if not cap.isOpened():
-        print("Error: Could not open video")
+        print("Error video bad")
         exit()
     else:
         ret, frame1 = cap.read()
@@ -130,8 +134,7 @@ for name in ["plate_d1", "vial_closeup", "vial_d2", "vial_d3", "vial_d5"]:
         contours = apply_watershed_segmentation(fg_mask, frame1)
         
         # Filter by area
-        min_contour_area = 30
-        max_contour_area = 500
+        max_contour_area = 25
         large_contours = [cnt for cnt in contours 
                         if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
         
@@ -155,15 +158,15 @@ for name in ["plate_d1", "vial_closeup", "vial_d2", "vial_d3", "vial_d5"]:
             # Apply background subtraction
             fg_mask = backSub.apply(frame2)
             
-            # Apply Otsu's binary thresholding
+            # Apply Otsu's thresholding
             ret, fg_mask = cv2.threshold(fg_mask, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
             
             # Apply watershed segmentation to separate touching flies
             contours = apply_watershed_segmentation(fg_mask, frame2)
             
             # Filter contours by size
-            min_contour_area = 10
-            max_contour_area = 500
+            min_contour_area = 25
+            max_contour_area = 300
             large_contours = [cnt for cnt in contours 
                             if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
             
@@ -213,9 +216,9 @@ for name in ["plate_d1", "vial_closeup", "vial_d2", "vial_d3", "vial_d5"]:
             
             out.write(frame2)
             
-            # Progress indicator
             if frame_count % 30 == 0:
-                print(f"@ {frame_count} frames with {len(tracked_objects)} flies")
+                print(f"{name} @ {frame_count} frames with {len(tracked_objects)} flies")
+
 
     cap.release()
     out.release()
