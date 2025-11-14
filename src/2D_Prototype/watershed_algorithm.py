@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 import random
 
-for name in ["plate_d1", "vial_closeup", "vial_d3", "vial_d2", "vial_d5"]:
+for name, min_contour_area in [("plate_d1", 15), ("vial_closeup", 10), ("vial_d3", 10), ("vial_d2", 10), ("vial_d5", 10)]:
     vid_path = f"SampleVideos/{name}.mp4"
     cap = cv2.VideoCapture(vid_path)
 
@@ -46,6 +46,11 @@ for name in ["plate_d1", "vial_closeup", "vial_d3", "vial_d2", "vial_d5"]:
             g = random.randint(0, 255)
             b = random.randint(0, 255)
             if (r, g, b) not in colors.values():
+                colors[obj_id] = (r, g, b)
+            else:
+                r = random.randint(0, 255)
+                g = random.randint(0, 255)
+                b = random.randint(0, 255)
                 colors[obj_id] = (r, g, b)
         return colors[obj_id]
 
@@ -114,7 +119,7 @@ for name in ["plate_d1", "vial_closeup", "vial_d3", "vial_d2", "vial_d5"]:
         return contours_list
 
     if not cap.isOpened():
-        print("Error: Could not open video")
+        print("Error video bad")
         exit()
     else:
         ret, frame1 = cap.read()
@@ -129,8 +134,8 @@ for name in ["plate_d1", "vial_closeup", "vial_d3", "vial_d2", "vial_d5"]:
         contours = apply_watershed_segmentation(fg_mask, frame1)
         
         # Filter by area
-        min_contour_area = 30
-        max_contour_area = 500
+        # min_contour_area = 15
+        max_contour_area = 25
         large_contours = [cnt for cnt in contours 
                         if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
         
@@ -161,8 +166,8 @@ for name in ["plate_d1", "vial_closeup", "vial_d3", "vial_d2", "vial_d5"]:
             contours = apply_watershed_segmentation(fg_mask, frame2)
             
             # Filter contours by size
-            min_contour_area = 10
-            max_contour_area = 500
+            min_contour_area = 25
+            max_contour_area = 300
             large_contours = [cnt for cnt in contours 
                             if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
             
@@ -190,7 +195,7 @@ for name in ["plate_d1", "vial_closeup", "vial_d3", "vial_d2", "vial_d5"]:
                         best_match_i = i
                 
                 # Assign match if found and distance is reasonable
-                if best_match_i != -1 and min_dist < 75:  # Distance threshold
+                if best_match_i != -1 and min_dist < 200:  # Distance threshold
                     new_tracked_objects[obj_id] = current_bboxes[best_match_i]
                     used_current.add(best_match_i)
             
@@ -212,8 +217,8 @@ for name in ["plate_d1", "vial_closeup", "vial_d3", "vial_d2", "vial_d5"]:
             
             out.write(frame2)
             
-            # if frame_count % 30 == 0:
-            #     print(f"@ {frame_count} frames with {len(tracked_objects)} flies")
+            if frame_count % 30 == 0:
+                print(f"{name} @ {frame_count} frames with {len(tracked_objects)} flies")
 
 cap.release()
 out.release()
