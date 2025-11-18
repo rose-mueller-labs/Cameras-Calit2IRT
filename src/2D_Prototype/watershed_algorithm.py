@@ -12,9 +12,15 @@ import cv2
 import numpy as np
 import random
 
-for name, min_contour_area in [("plate_d1", 15), ("vial_closeup", 10), ("vial_d3", 10), ("vial_d2", 10), ("vial_d5", 10)]:
+for name, min_contour_area in [("plate_d1", 15),
+                            #    ("vial_closeup", 10), 
+                            #    ("vial_d3", 10), 
+                            #    ("vial_d2", 10), 
+                            #    ("vial_d5", 10)
+                               ]:
     vid_path = f"SampleVideos/{name}.mp4"
     cap = cv2.VideoCapture(vid_path)
+    csv_name = f"Tracked_{name}.csv"
 
     # Get video properties
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -215,7 +221,9 @@ for name, min_contour_area in [("plate_d1", 15), ("vial_closeup", 10), ("vial_d3
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
             
             out.write(frame2)
-            
+            print(tracked_objects)
+            with open(f"{csv_name}", 'w'):
+                
             if frame_count % 30 == 0:
                 print(f"{name} @ {frame_count} frames with {len(tracked_objects)} flies")
 
