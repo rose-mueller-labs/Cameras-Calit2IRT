@@ -1,0 +1,35 @@
+1. background subtraction
+* use KNN background substractor to separate moving flies from the background.
+* this outputs the FOREGROUND MASK which is just the moving flies.
+* applies Otsu's thresholding to create a clean binary image of detected movement
+* so now it's all black and white
+
+2. watershed segmentation
+* This is the part that splits apart flies from the foreground mask that are touching each other, 
+which does it thru these steps:
+    (1) removing noise through morphological operations
+    (2) identifies definite background and foreground areas using distance transforms
+    (3) marks unknown regions (areas that could be either foreground or background)
+    (4) applies the watershed algorithm to segment touching objects into separate contours
+
+3. object tracking data structures (the dicts)
+* tracked_objects = stores current fly positions (the coordinates based on what bbox returns)
+* lost_objects = temporarily holds flies that disappeared (maybe they stopped moving) -> doesn't rlly work rn 
+cuz it isn't mapping that well still
+* object_paths = records movement history for drawing trails (basically for each fly ID the bbox coors form earlier)
+* object_lifetimes = counts how many frames each fly has been visible (this is for pruning & CSV purposes)
+* colors = assigns unique RGB colors to each fly ID for visualization
+
+4. matching algorithm (todo: put velocity stuff in, I think that the problem is with this section now)
+* calculate distance between previously tracked flies and newly detected objects
+* assigns the same ID to flies that are close to their previous position (within the distance threshold)
+* if a fly can't be matched, it goes into the lost objects pool for potential recovery in future frames
+
+5. pruning/filtering
+* objects must appear for at least 5 consecutive frames to be considered valid flies
+* this filters out noise and transient detection errors
+
+6. Data Export
+* saves all tracking data to a CSV file where:
+    (a) each row is a frame
+    (b) each column is a fly ID, containing their (x,y) coordinates at that moment

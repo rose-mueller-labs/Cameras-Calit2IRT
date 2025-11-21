@@ -5,18 +5,26 @@ https://www.geeksforgeeks.org/computer-vision/image-segmentation-with-watershed-
 Issues found:
 - Flies being redected after inactivity as new flies
 - Flies sometimes being changed into new ID flies for seemingly no reason, why is that happening
-'''
+- Zig-zaggy paths, this is due to the matching algorithm -> make it use velocity to see the changes
 
+Solutions implemented:
+- Added path tracking and visualization
+- Filter out objects that appear for less than 5 frames
+- Improved ID consistency with temporal tracking and lost object recovery
+'''
 
 import cv2
 import numpy as np
 import random
 import csv
+from collections import deque
 
 for name, min_contour_area in [
-                            ("1x_bettercrop", 5),
-                            # ("plate_d1", 15),
-                            #    ("vial_closeup", 10), 
+                            # ("1x_bettercrop", 5),
+                            # ("1x_speed", 10),
+                            # ("20x_speed", 5),
+                            ("plate_d1", 30),
+                            #   ("vial_closeup", 10), 
                             #    ("vial_d3", 10), 
                             #    ("vial_d2", 10), 
                             #    ("vial_d5", 10)
@@ -29,7 +37,7 @@ for name, min_contour_area in [
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    output_path = f'WatershedAlgorithm/{name}_written.mp4'
+    output_path = f'WatershedAlgorithm/{name}_path_written.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
@@ -38,7 +46,19 @@ for name, min_contour_area in [
     # Object tracking dictionaries
     next_object_id = 0
     tracked_objects = {}  # key = object_id and value = (x, y, w, h)
+    lost_objects = {}  # Temporarily store lost objects for recovery for when flies disappear and then appear again
+    object_paths = {}  # key = object_id and value = deque of (cx, cy) positions
+    object_lifetimes = {}  # key = object_id and value = number of frames seen
     colors = {}  # key = object_id and value = color
+    
+    # To store into CSV the different coordinates across frames and fly ID's
+    tracking_data = []  # List of dictionaries, one per frame
+    
+    # Tracking parameters
+    MAX_LOST_FRAMES = 10  # how many frames to keep lost objects for potential recovery
+    MIN_LIFETIME = 5  # min frames an object must be seen to be considered valid
+    MAX_PATH_LENGTH = 50  # max number of points to keep in path history
+    DISTANCE_THRESHOLD = 100  # max distance for matching (reduced from 200)
 
     def get_center(bbox):
         x, y, w, h = bbox
@@ -127,6 +147,23 @@ for name, min_contour_area in [
         
         return contours_list
 
+    def draw_paths(frame, paths, obj_id):
+        """Draw the path history for a given object"""
+        if obj_id in paths and len(paths[obj_id]) > 1:
+            color = get_unique_color(obj_id)
+            points = list(paths[obj_id])
+            
+            # Draw lines connecting the path points
+            for i in range(len(points) - 1):
+                # Make older points more transparent (fade effect)
+                # alpha = (i + 1) / len(points)
+                # thickness = max(1, int(2 * alpha))
+                thickness = 1
+                cv2.line(frame, points[i], points[i + 1], color, thickness)
+            
+            # Draw a circle at the most recent position
+            cv2.circle(frame, points[-1], 3, color, -1)
+
     if not cap.isOpened():
         print("Error video bad")
         exit()
@@ -151,7 +188,17 @@ for name, min_contour_area in [
         for cnt in large_contours:
             bbox = cv2.boundingRect(cnt)
             tracked_objects[next_object_id] = bbox
+            object_lifetimes[next_object_id] = 1
+            cx, cy = get_center(bbox)
+            object_paths[next_object_id] = deque([(cx, cy)], maxlen=MAX_PATH_LENGTH)
             next_object_id += 1
+        
+        # Store first frame data
+        frame_data = {'frame': 0}
+        for obj_id, bbox in tracked_objects.items():
+            cx, cy = get_center(bbox)
+            frame_data[f'ID_{obj_id}'] = f'({cx},{cy})'
+        tracking_data.append(frame_data)
         
         frame_count = 0
         print(f"Starting tracking with {len(tracked_objects)} initial flies detected")
@@ -186,7 +233,7 @@ for name, min_contour_area in [
             new_tracked_objects = {}
             used_current = set()
             
-            # For each tracked object, find closest match in current frame
+            # First, try to match with currently tracked objects
             for obj_id, prev_bbox in tracked_objects.items():
                 if len(current_bboxes) == 0:
                     break
@@ -203,35 +250,120 @@ for name, min_contour_area in [
                         best_match_i = i
                 
                 # Assign match if found and distance is reasonable
-                if best_match_i != -1 and min_dist < 200: # increase min dist cuz it hella making new flies
+                if best_match_i != -1 and min_dist < DISTANCE_THRESHOLD:
                     new_tracked_objects[obj_id] = current_bboxes[best_match_i]
                     used_current.add(best_match_i)
+                    object_lifetimes[obj_id] += 1
+                    
+                    # Update path
+                    cx, cy = get_center(current_bboxes[best_match_i])
+                    object_paths[obj_id].append((cx, cy))
+                else:
+                    # Object lost means we add it to lost objects for potential recovery when flies re-appear
+                    if obj_id not in lost_objects:
+                        lost_objects[obj_id] = {'bbox': prev_bbox, 'frames_lost': 1}
+                    else:
+                        lost_objects[obj_id]['frames_lost'] += 1
             
-            # Assign new IDs to unmatched flies
+            # Try to recover lost objects with remaining unmatched detections
+            lost_to_remove = []
+            for obj_id, lost_data in lost_objects.items():
+                if lost_data['frames_lost'] > MAX_LOST_FRAMES:
+                    lost_to_remove.append(obj_id)
+                    continue
+                
+                min_dist = float('inf')
+                best_match_i = -1
+                
+                for i, curr_bbox in enumerate(current_bboxes):
+                    if i in used_current:
+                        continue
+                    dist = calculate_distance(lost_data['bbox'], curr_bbox)
+                    if dist < min_dist:
+                        min_dist = dist
+                        best_match_i = i
+                
+                # Recover the object if a good match is found
+                if best_match_i != -1 and min_dist < DISTANCE_THRESHOLD * 2:  # More lenient for recovery of lost flies
+                    new_tracked_objects[obj_id] = current_bboxes[best_match_i]
+                    used_current.add(best_match_i)
+                    object_lifetimes[obj_id] += 1
+                    
+                    # Update path
+                    cx, cy = get_center(current_bboxes[best_match_i])
+                    object_paths[obj_id].append((cx, cy))
+                    
+                    lost_to_remove.append(obj_id)
+            
+            # Remove recovered or expired lost objects
+            for obj_id in lost_to_remove:
+                del lost_objects[obj_id]
+            
+            # Assign new IDs to remaining unmatched flies
             for i, curr_bbox in enumerate(current_bboxes):
                 if i not in used_current:
                     new_tracked_objects[next_object_id] = curr_bbox
+                    object_lifetimes[next_object_id] = 1
+                    cx, cy = get_center(curr_bbox)
+                    object_paths[next_object_id] = deque([(cx, cy)], maxlen=MAX_PATH_LENGTH)
                     next_object_id += 1
             
             tracked_objects = new_tracked_objects
             
-            # Draw bounding boxes with unique colors for each fly ID
+            # Store current frame data (only for objects with sufficient lifetime)
+            frame_data = {'frame': frame_count}
             for obj_id, bbox in tracked_objects.items():
-                x, y, w, h = bbox
-                color = get_unique_color(obj_id)
-                frame2 = cv2.rectangle(frame2, (x, y), (x+w, y+h), color, 3)
-                cv2.putText(frame2, f'ID:{obj_id}', (x, y-10), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                if object_lifetimes.get(obj_id, 0) >= MIN_LIFETIME:
+                    cx, cy = get_center(bbox)
+                    frame_data[f'ID_{obj_id}'] = f'({cx},{cy})'
+            tracking_data.append(frame_data)
+            
+            # Draw paths and bounding boxes (only for objects with sufficient lifetime)
+            for obj_id, bbox in tracked_objects.items():
+                if object_lifetimes.get(obj_id, 0) >= MIN_LIFETIME:
+                    # Draw path
+                    draw_paths(frame2, object_paths, obj_id)
+                    
+                    # Draw bounding box
+                    x, y, w, h = bbox
+                    color = get_unique_color(obj_id)
+                    frame2 = cv2.rectangle(frame2, (x, y), (x+w, y+h), color, 3)
+                    cv2.putText(frame2, f'ID:{obj_id}', (x, y-10), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
             
             out.write(frame2)
-            print(tracked_objects)
-            # with open(f"{csv_name}", 'w'):
-            #     csv_writer = csv.writer()
-                
-                
+            
             if frame_count % 30 == 0:
-                print(f"{name} @ {frame_count} frames with {len(tracked_objects)} flies")
+                valid_flies = sum(1 for obj_id in tracked_objects if object_lifetimes.get(obj_id, 0) >= MIN_LIFETIME)
+                print(f"{name} @ {frame_count} frames with {valid_flies} valid flies (total tracked: {len(tracked_objects)})")
 
+    # Write tracking data to CSV after processing all frames
+    if tracking_data:
+        # Get all unique fly IDs that appeared across all frames with sufficient lifetime
+        all_fly_ids = set()
+        for frame_data in tracking_data:
+            all_fly_ids.update([k for k in frame_data.keys() if k.startswith('ID_')])
+        
+        sorted_fly_ids = sorted(all_fly_ids, key=lambda x: int(x.split('_')[1]))
+        
+        # Write CSV
+        with open(csv_name, 'w', newline='') as csvfile:
+            # Create header: Frame, ID_0, ID_1, ID_2, ...
+            fieldnames = ['frame'] + sorted_fly_ids
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            
+            writer.writeheader()
+            
+            # Write each frame's data
+            for frame_data in tracking_data:
+                # Fill in empty values for flies not present in this frame
+                row = {'frame': frame_data['frame']}
+                for fly_id in sorted_fly_ids:
+                    row[fly_id] = frame_data.get(fly_id, '')
+                writer.writerow(row)
+        
+        # print(f"Tracking data saved to {csv_name}")
+        print(f"Total unique flies tracked: {len(sorted_fly_ids)}")
 
     cap.release()
     out.release()

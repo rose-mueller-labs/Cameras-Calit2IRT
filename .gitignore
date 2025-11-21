@@ -1,5 +1,8 @@
 src/2D_Prototype/SampleVideos
+src/2D_Prototype/WatershedAlgorithm
+src/2D_Prototype/DistanceComparisonOutputs
 .DS_Store
 .venv
 ../../.DS_Store
 ../.DS_Store
+*.DS_Store

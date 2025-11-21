@@ -31,7 +31,7 @@ import random
 # print(cv2.getBuildInformation())
 
 
-name = "vial_d5"
+name = "1x_bettercrop"
 vid_path = f"SampleVideos/{name}.mp4"
 # vid_path = f"plate_d1.mp4"
 cap = cv2.VideoCapture(vid_path)

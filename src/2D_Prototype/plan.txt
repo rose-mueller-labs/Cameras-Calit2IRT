@@ -1,4 +1,8 @@
-1. Noodle with prev video and test out different algorithms, see what happens
-what are some simple detection algorithms?
-
-![](/home/drosophila-lab/Documents/Cameras-Calit2IRT/src/2D_Prototype/Noodling/plate_d1_written.mp4)
+* watershed_algorithm.py = PURE watershed without any pathing being drawing
+    FAILS when there is only 1-2 flies
+    PASSES with 3+ flies
+* frame_comparison_detection.py = default cv2 contouring paired with the distance calcs b/w current_bboxes
+    FAILS because it CANNOT differentiate between two flies touching each other but PASSES with one fly only
+* watershed_pathing.py = watershed + pathing to draw out where flies are going
+    FAILS when there is only 1-2 flies
+    PASSES with 3+ flies
