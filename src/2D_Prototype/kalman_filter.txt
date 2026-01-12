@@ -1,0 +1,32 @@
+1. background subtraction
+* uses a KNN background subtractor (`createBackgroundSubtractorKNN`) to separate moving flies from the static background in each frame.  
+* produces a foreground mask `fg_mask` where moving regions (ideally the flies) are bright and the background is dark.  
+* applies a fixed binary threshold (`cv2.threshold`) followed by morphological opening (`cv2.morphologyEx` with an ellipse kernel) to remove small noise and speckles from `fg_mask`.  
+* the cleaned mask `mask_eroded` is a black‑and‑white image where flies appear as solid white blobs that can be passed to `findContours` for detection.  
+
+2. contour detection (no watershed here)
+* runs `cv2.findContours` on the cleaned binary mask to extract all connected components that represent candidate flies.  
+* filters out very small contours using an area threshold (`min_contour_area`) so that only sufficiently large blobs are kept as potential flies.  
+* converts each remaining contour to a bounding box with `cv2.boundingRect`, producing `(x, y, w, h)` rectangles stored in `current_bboxes`.  
+* repeats this process on the first frame for initialization and on every subsequent frame to get the current set of observed fly positions.  
+
+3. object tracking data structures (the dicts)
+* `tracks` is a dict keyed by fly ID; each entry stores the Kalman filter (`'kf'`), the latest bounding box (`'bbox'`), and a `'missed'` counter for how many frames it has gone unmatched.  
+* `colors` is a dict from fly ID to a unique RGB tuple so that each fly is drawn with a consistent color on the video frames.  
+* during initialization, each detected contour in the first frame creates a new track with its own Kalman filter and bounding box, and `next_object_id` is incremented to keep IDs unique.  
+* across frames, `tracks` is replaced by `new_tracks` after each update step, so only active and recently missed flies remain in the structure.  
+
+4. matching algorithm with Kalman filtering
+* for every existing track, the Kalman filter performs a prediction step (`kf.predict`), producing a predicted center position for the fly in the current frame.  
+* the algorithm computes Euclidean distances between each predicted center and all detected bounding box centers in `current_bboxes`, then greedily assigns the closest unmatched detection to each track if it is within `max_dist`.  
+* when a match is found, the detection center is used as a measurement (`kf.correct`), updating the track’s state and bounding box and resetting its `'missed'` counter to zero.  
+* tracks that fail to find a suitable detection simply increase their `'missed'` counter and keep their predicted state, while any detections left unmatched at the end start brand‑new tracks with fresh Kalman filters and new IDs.  
+
+5. pruning/filtering
+* each track maintains a `'missed'` counter; if a track has been unmatched for more than `max_missed` frames, it is dropped and not copied into `new_tracks`.  
+* this prevents the tracker from keeping stale IDs for flies that have permanently left the field of view and avoids unbounded growth of the `tracks` dictionary.  
+* short‑lived noise blobs that only appear briefly will naturally fail to be matched consistently and will be removed after exceeding the missed‑frame threshold.  
+
+6. Data Export (todo)
+* inside the drawing loop, there is a placeholder comment indicating where to write tracking information such as `(frame_idx, obj_id, x_center, y_center, bbox, etc.)` to a CSV file.  
+* by logging one line per `(frame, ID)` pair, you can later reconstruct full trajectories per fly ID and export them in a format where each row is a frame and each fly’s coordinates can be grouped or pivoted into columns for analysis.
