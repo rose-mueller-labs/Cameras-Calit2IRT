@@ -23,13 +23,16 @@ for name, min_contour_area in [
                             # ("1x_bettercrop", 5),
                             # ("1x_speed", 10),
                             # ("20x_speed", 5),
-                            ("plate_d1", 30),
+                            # ("plate_d1", 30),
                             #   ("vial_closeup", 10), 
                             #    ("vial_d3", 10), 
                             #    ("vial_d2", 10), 
                             #    ("vial_d5", 10)
+                            # ("120fps 2K.MXF", 30)
+                            # ("4k 24fps.MXF", 30)
+                            ("4k 60fps.MXF", 30)
                                ]:
-    vid_path = f"SampleVideos/{name}.mp4"
+    vid_path = f"SampleVideos/{name}"
     cap = cv2.VideoCapture(vid_path)
     csv_name = f"Tracked_{name}.csv"
 
@@ -37,7 +40,7 @@ for name, min_contour_area in [
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    output_path = f'WatershedAlgorithm/{name}_path_written.mp4'
+    output_path = f'WatershedAlgorithm/{name}_path_written_watershed.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 

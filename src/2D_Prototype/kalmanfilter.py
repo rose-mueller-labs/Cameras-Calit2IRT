@@ -8,8 +8,8 @@ import csv
 import os
 import random
 
-name = "20x_speed"
-vid_path = f"SampleVideos/{name}.mp4"
+name = "4k 60fps.MXF"
+vid_path = f"SampleVideos/{name}"
 cap = cv2.VideoCapture(vid_path)
 
 frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -41,7 +41,7 @@ def get_unique_color(obj_id):
 def create_kalman(initial_center):
     # State: [x, y, vx, vy]
     kf = cv2.KalmanFilter(4, 2)
-    dt = 1.0 # assumes 1 frame per time unit; you can use 1/fps
+    dt = 120.0 # assumes 1 frame per time unit; you can use 1/fps
 
     # F
     kf.transitionMatrix = np.array([

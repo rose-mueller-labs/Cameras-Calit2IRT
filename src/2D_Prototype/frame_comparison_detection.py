@@ -31,8 +31,8 @@ import random
 # print(cv2.getBuildInformation())
 
 
-name = "1x_bettercrop"
-vid_path = f"SampleVideos/{name}.mp4"
+name = "4k 60fps"
+vid_path = f"SampleVideos/{name}.MXF"
 # vid_path = f"plate_d1.mp4"
 cap = cv2.VideoCapture(vid_path)
 
@@ -40,7 +40,7 @@ cap = cv2.VideoCapture(vid_path)
 frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fps = int(cap.get(cv2.CAP_PROP_FPS))
-output_path = f'DistanceComparisonOutputs/{name}_written.mp4'
+output_path = f'DistanceComparisonOutputs/{name}_written_fcd.mp4'
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
