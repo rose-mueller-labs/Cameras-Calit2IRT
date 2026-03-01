@@ -7,3 +7,8 @@ src/2D_Prototype/DistanceComparisonOutputs
 ../.DS_Store
 *.DS_Store
 *.zip
+120fps 2K
+SampleVideos
+DistanceComparisonOutputs
+KalmanFilter
+Outputs
