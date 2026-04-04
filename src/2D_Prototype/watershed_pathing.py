@@ -28,9 +28,9 @@ for name, min_contour_area in [
                             #    ("vial_d3", 10), 
                             #    ("vial_d2", 10), 
                             #    ("vial_d5", 10)
-                            # ("120fps 2K.MXF", 30)
+                            ("120fps 2K.MXF", 30)
                             # ("4k 24fps.MXF", 30)
-                            ("4k 60fps.MXF", 30)
+                            # ("4k 60fps.MXF", 30)
                                ]:
     vid_path = f"SampleVideos/{name}"
     cap = cv2.VideoCapture(vid_path)
@@ -40,7 +40,7 @@ for name, min_contour_area in [
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    output_path = f'WatershedAlgorithm/{name}_path_written_watershed.mp4'
+    output_path = f'./2D_Prototype/WatershedAlgorithm/{name}_path_written_watershed.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
@@ -62,6 +62,8 @@ for name, min_contour_area in [
     MIN_LIFETIME = 5  # min frames an object must be seen to be considered valid
     MAX_PATH_LENGTH = 50  # max number of points to keep in path history
     DISTANCE_THRESHOLD = 100  # max distance for matching (reduced from 200)
+
+    CURRENT_TOTAL_FLIES = 0
 
     def get_center(bbox):
         x, y, w, h = bbox
@@ -161,7 +163,7 @@ for name, min_contour_area in [
                 # Make older points more transparent (fade effect)
                 # alpha = (i + 1) / len(points)
                 # thickness = max(1, int(2 * alpha))
-                thickness = 1
+                thickness = 2
                 cv2.line(frame, points[i], points[i + 1], color, thickness)
             
             # Draw a circle at the most recent position
@@ -322,6 +324,7 @@ for name, min_contour_area in [
             tracking_data.append(frame_data)
             
             # Draw paths and bounding boxes (only for objects with sufficient lifetime)
+            CURRENT_TOTAL_FLIES = len(tracked_objects)
             for obj_id, bbox in tracked_objects.items():
                 if object_lifetimes.get(obj_id, 0) >= MIN_LIFETIME:
                     # Draw path
@@ -331,8 +334,8 @@ for name, min_contour_area in [
                     x, y, w, h = bbox
                     color = get_unique_color(obj_id)
                     frame2 = cv2.rectangle(frame2, (x, y), (x+w, y+h), color, 3)
-                    cv2.putText(frame2, f'ID:{obj_id}', (x, y-10), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                    cv2.putText(frame2, f'ID:{obj_id}', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2)
+            cv2.putText(frame2, f'TOTAL FLIES: {CURRENT_TOTAL_FLIES}', (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 2)
             
             out.write(frame2)
             
@@ -367,7 +370,7 @@ for name, min_contour_area in [
         
         # print(f"Tracking data saved to {csv_name}")
         print(f"Total unique flies tracked: {len(sorted_fly_ids)}")
-
     cap.release()
     out.release()
     cv2.destroyAllWindows()
+    print(f'Saved to {output_path}')
