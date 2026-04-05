@@ -41,13 +41,13 @@ for name, min_contour_area in [
                                ]:
     vid_path = f"SampleVideos/{name}"
     cap = cv2.VideoCapture(vid_path)
-    csv_name = f"Tracked_{name}.csv"
+    csv_name = f"./2D_Prototype/Tracked_{name}.csv"
 
     # Get video properties
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    output_path = f'./2D_Prototype/WatershedAlgorithm/{name}_path_written_watershed.mp4'
+    output_path = f'./2D_Prototype/WatershedAlgorithm/{name}_path_written_watershed_thresh.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
@@ -77,27 +77,23 @@ for name, min_contour_area in [
     CURRENT_TOTAL_FLIES = 0
 
     # ------------------------------------------------------------------
-    # [FIX] HSV color thresholding — replaces KNN background subtraction
-    # Tune these ranges using the snippet below if needed:
-    #
-    #   frame = cv2.imread("your_sample_frame.png")
-    #   hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    #   def on_click(event, x, y, flags, param):
-    #       if event == cv2.EVENT_LBUTTONDOWN:
-    #           print(f"HSV at ({x},{y}): {hsv[y,x]}")
-    #   cv2.imshow("frame", frame)
-    #   cv2.setMouseCallback("frame", on_click)
-    #   cv2.waitKey(0)
-    #
-    # H = hue (0-180), S = saturation (0-255), V = brightness (0-255)
-    # For dark flies on a light background, V (brightness) is the main
-    # discriminator. Adjust UPPER_BLACK[2] (currently 60) up/down first —
-    # it's the most sensitive knob.
+    # HSV at (906,476): [ 19 111 166] fly
+    # HSV at (913,474): [ 24 115 146]
+    # HSV at (907,477): [ 17 110 171]
+    # HSV at (903,482): [ 30 221 111]
+    # HSV at (922,466): [105  11 238]
+    # HSV at (827,481): [ 30  98 130]
+    # HSV at (827,488): [ 31  94 189]
+    # HSV at (823,492): [ 38  95 145]
+    # HSV at (826,515): [ 31  84 161]
+    # HSV at (831,515): [ 31  57 198]
+    # HSV at (731,652): [ 35 191 107]
+    # HSV at (738,658): [ 23 131 148]
+    # HSV at (744,662): [ 36 145 120] fly
+    # HSV at (1096,711): [105   2 255] bg
     # ------------------------------------------------------------------
-    LOWER_BROWN = np.array([0,  20,  0])
-    UPPER_BROWN = np.array([30, 255, 80])
-    LOWER_BLACK = np.array([0,  0,   0])
-    UPPER_BLACK = np.array([180, 80, 60])
+    LOWER_BROWN = np.array([0,  50,  100])
+    UPPER_BROWN = np.array([40, 135, 200])
 
     def get_fly_mask(frame):
         """
@@ -109,8 +105,7 @@ for name, min_contour_area in [
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
         mask_brown = cv2.inRange(hsv, LOWER_BROWN, UPPER_BROWN)
-        mask_black = cv2.inRange(hsv, LOWER_BLACK, UPPER_BLACK)
-        fg_mask = cv2.bitwise_or(mask_brown, mask_black)
+        fg_mask = mask_brown
 
         # Clean up noise: open removes small specks, close fills small gaps
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
