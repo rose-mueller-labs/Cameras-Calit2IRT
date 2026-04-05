@@ -11,8 +11,6 @@ Solutions implemented:
 - Added path tracking and visualization
 - Filter out objects that appear for less than 5 frames
 - Improved ID consistency with temporal tracking and lost object recovery
-- [FIX] Save last known position of lost flies; when a new detection appears nearby within
-         MAX_LOST_FRAMES, re-assign the old fly's ID instead of creating a new one.
 '''
 
 import cv2

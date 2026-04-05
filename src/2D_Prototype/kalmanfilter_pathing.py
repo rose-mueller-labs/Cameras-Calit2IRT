@@ -9,6 +9,8 @@ import os
 import random
 from collections import deque  # [FIX] for path history
 
+# TODO: Add in the flying fix with velocity stuff
+
 
 name = "4k 24fps.MXF"
 vid_path = f"SampleVideos/{name}"
@@ -87,7 +89,7 @@ def create_kalman(initial_center):
     return kf
 
 
-# [FIX] Draw the stored path for a single fly
+# Draw the stored path for a single fly
 def draw_path(frame, obj_id):
     if obj_id not in object_paths or len(object_paths[obj_id]) < 2:
         return
@@ -124,14 +126,14 @@ for cnt in large_contours:
     center = get_center(bbox)
     kf = create_kalman(center)
     tracks[next_object_id] = {'kf': kf, 'bbox': bbox, 'missed': 0}
-    # [FIX] Initialise path with the first known center
+    # Initialise path with the first known center
     cx, cy = int(center[0]), int(center[1])
     object_paths[next_object_id] = deque([(cx, cy)], maxlen=MAX_PATH_LENGTH)
     next_object_id += 1
 
 
-max_dist = 50.0   # distance threshold for association
-max_missed = 10   # frames to keep an unobserved track
+max_dist = 50.0 # distance threshold for association
+max_missed = 10 # frames to keep an unobserved track
 
 frame_idx = 1
 
@@ -194,7 +196,7 @@ while cap.isOpened():
                 object_paths[obj_id] = deque(maxlen=MAX_PATH_LENGTH)
             object_paths[obj_id].append((cx, cy))
         else:
-            # No good match — keep predicted state, increment missed, no path update
+            # No good match so we keep predicted state, increment missed, no path update
             tr['missed'] += 1
             if tr['missed'] <= max_missed:
                 new_tracks[obj_id] = tr
@@ -205,7 +207,7 @@ while cap.isOpened():
         center = get_center(bbox)
         kf = create_kalman(center)
         new_tracks[next_object_id] = {'kf': kf, 'bbox': bbox, 'missed': 0}
-        # [FIX] Initialise path for the new track
+        # Initialise path for the new track
         cx, cy = int(center[0]), int(center[1])
         object_paths[next_object_id] = deque([(cx, cy)], maxlen=MAX_PATH_LENGTH)
         next_object_id += 1
@@ -217,7 +219,7 @@ while cap.isOpened():
         x, y, w, h = tr['bbox']
         color = get_unique_color(obj_id)
 
-        # [FIX] Draw path trail before the bounding box so the box sits on top
+        # Draw path trail before the bounding box so the box sits on top
         draw_path(frame2, obj_id)
 
         cv2.rectangle(frame2, (x, y), (x + w, y + h), color, 2)

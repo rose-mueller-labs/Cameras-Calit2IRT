@@ -11,11 +11,10 @@ Solutions implemented:
 - Added path tracking and visualization
 - Filter out objects that appear for less than 5 frames
 - Improved ID consistency with temporal tracking and lost object recovery
-- [FIX] Hungarian algorithm for optimal global assignment (prevents ID swaps on brush-by)
-- [FIX] Velocity-predicted matching (predicts where each fly will be, not just where it was)
-- [FIX] Stationary fly detection with extended lost-object window (prevents re-ID after rest)
-- [FIX] Replaced KNN background subtraction with HSV color thresholding for dark flies on light bg
-         Tune lower/upper_brown and lower/upper_black HSV ranges to match your specific video.
+- Hungarian algorithm for optimal global assignment (prevents ID swaps on brush-by)
+- Velocity-predicted matching (predicts where each fly will be, not just where it was)
+- Stationary fly detection with extended lost-object window (prevents re-ID after rest)
+- Replaced KNN background subtraction with HSV color thresholding for dark flies on light bg
 '''
 
 import cv2
@@ -23,7 +22,7 @@ import numpy as np
 import random
 import csv
 from collections import deque
-from scipy.optimize import linear_sum_assignment  # [FIX] Hungarian algorithm
+from scipy.optimize import linear_sum_assignment  # Hungarian algorithm
 
 for name, min_contour_area in [
                             # ("1x_bettercrop", 5),
@@ -51,32 +50,31 @@ for name, min_contour_area in [
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
-    # [FIX] No more KNN background subtractor — using HSV thresholding instead
+    # No more KNN background subtractor using HSV thresholding instead
 
     # Object tracking dictionaries
     next_object_id = 0
-    tracked_objects = {}        # key = object_id, value = (x, y, w, h)
-    lost_objects = {}           # Temporarily store lost objects for recovery
-    object_paths = {}           # key = object_id, value = deque of (cx, cy) positions
-    object_lifetimes = {}       # key = object_id, value = number of frames seen
-    object_was_stationary = {}  # [FIX] key = object_id, value = bool (was stationary when lost)
-    colors = {}                 # key = object_id, value = color
+    tracked_objects = {} # key = object_id, value = (x, y, w, h)
+    lost_objects = {} # Temporarily store lost objects for recovery
+    object_paths = {} # key = object_id, value = deque of (cx, cy) positions
+    object_lifetimes = {} # key = object_id, value = number of frames seen
+    object_was_stationary = {}  # key = object_id, value = bool (was stationary when lost)
+    colors = {} # key = object_id, value = color
 
     # To store into CSV the different coordinates across frames and fly IDs
     tracking_data = []  # List of dictionaries, one per frame
 
     # Tracking parameters
-    MAX_LOST_FRAMES = 10               # how many frames to keep a moving lost object
-    STATIONARY_LOST_MULTIPLIER = 5     # [FIX] multiply MAX_LOST_FRAMES for stationary flies
-    MIN_LIFETIME = 5                   # min frames an object must be seen to be considered valid
-    MAX_PATH_LENGTH = 50               # max number of points to keep in path history
-    DISTANCE_THRESHOLD = 100           # max distance for matching
-    STATIONARY_THRESHOLD = 3.0         # [FIX] pixel displacement below which a fly is "stationary"
-    VELOCITY_HISTORY = 5               # [FIX] number of recent frames used to compute velocity
+    MAX_LOST_FRAMES = 10 # how many frames to keep a moving lost object
+    STATIONARY_LOST_MULTIPLIER = 5 # multiply MAX_LOST_FRAMES for stationary flies
+    MIN_LIFETIME = 5 # min frames an object must be seen to be considered valid
+    MAX_PATH_LENGTH = 50 # max number of points to keep in path history
+    DISTANCE_THRESHOLD = 100 # max distance for matching
+    STATIONARY_THRESHOLD = 3.0 # pixel displacement below which a fly is "stationary"
+    VELOCITY_HISTORY = 5 # number of recent frames used to compute velocity
 
     CURRENT_TOTAL_FLIES = 0
 
-    # ------------------------------------------------------------------
     # HSV at (906,476): [ 19 111 166] fly
     # HSV at (913,474): [ 24 115 146]
     # HSV at (907,477): [ 17 110 171]
@@ -91,7 +89,6 @@ for name, min_contour_area in [
     # HSV at (738,658): [ 23 131 148]
     # HSV at (744,662): [ 36 145 120] fly
     # HSV at (1096,711): [105   2 255] bg
-    # ------------------------------------------------------------------
     LOWER_BROWN = np.array([0,  50,  100])
     UPPER_BROWN = np.array([40, 135, 200])
 
@@ -123,9 +120,7 @@ for name, min_contour_area in [
         x2, y2 = get_center(bbox2)
         return np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
-    # ------------------------------------------------------------------
-    # [FIX] Velocity helpers
-    # ------------------------------------------------------------------
+    # Velocity helpers
     def get_velocity(obj_id):
         """Return smoothed (vx, vy) from the last VELOCITY_HISTORY path points."""
         if obj_id not in object_paths or len(object_paths[obj_id]) < 2:
@@ -148,9 +143,7 @@ for name, min_contour_area in [
         px, py = predicted_center
         return np.sqrt((cx - px) ** 2 + (cy - py) ** 2)
 
-    # ------------------------------------------------------------------
-    # [FIX] Stationary detection
-    # ------------------------------------------------------------------
+    # Stationary detection
     def is_stationary(obj_id):
         """True if the fly has barely moved over the last VELOCITY_HISTORY frames."""
         if obj_id not in object_paths or len(object_paths[obj_id]) < VELOCITY_HISTORY:
@@ -162,9 +155,7 @@ for name, min_contour_area in [
         )
         return max_disp < STATIONARY_THRESHOLD
 
-    # ------------------------------------------------------------------
-    # [FIX] Hungarian-algorithm matching
-    # ------------------------------------------------------------------
+    # Hungarian-algorithm matching
     def match_objects_hungarian(tracked_objs, current_bboxes, threshold):
         """
         Globally optimal assignment using the Hungarian algorithm.
@@ -273,7 +264,7 @@ for name, min_contour_area in [
         ret, frame1 = cap.read()
 
         # Initialize first frame objects
-        fg_mask = get_fly_mask(frame1)  # [FIX] was: backSub.apply + Otsu threshold
+        fg_mask = get_fly_mask(frame1)  #  was: backSub.apply + Otsu threshold
         contours = apply_watershed_segmentation(fg_mask, frame1)
 
         max_contour_area = 25
@@ -304,7 +295,7 @@ for name, min_contour_area in [
 
             frame_count += 1
 
-            # [FIX] HSV thresholding instead of KNN background subtraction
+            # HSV thresholding instead of KNN background subtraction
             fg_mask = get_fly_mask(frame2)
 
             # Watershed segmentation
@@ -319,9 +310,7 @@ for name, min_contour_area in [
 
             new_tracked_objects = {}
 
-            # ----------------------------------------------------------
-            # [FIX] Step 1: Hungarian matching on currently tracked objects
-            # ----------------------------------------------------------
+            # Hungarian matching on currently tracked objects
             matched, unmatched_obj_ids, unmatched_bbox_indices = match_objects_hungarian(
                 tracked_objects, current_bboxes, DISTANCE_THRESHOLD
             )
@@ -337,7 +326,7 @@ for name, min_contour_area in [
 
             # Unmatched tracked objects → move to lost_objects
             for obj_id in unmatched_obj_ids:
-                # [FIX] Record whether this fly was stationary before losing it
+                # Record whether this fly was stationary before losing it
                 stationary = is_stationary(obj_id)
                 object_was_stationary[obj_id] = stationary
                 extended_limit = (MAX_LOST_FRAMES * STATIONARY_LOST_MULTIPLIER
@@ -352,9 +341,7 @@ for name, min_contour_area in [
                 else:
                     lost_objects[obj_id]['frames_lost'] += 1
 
-            # ----------------------------------------------------------
-            # [FIX] Step 2: Try to recover lost objects with remaining detections
-            # ----------------------------------------------------------
+            # Try to recover lost objects with remaining detections
             remaining_bbox_indices = [i for i in unmatched_bbox_indices if i not in used_current]
             lost_to_remove = []
 
