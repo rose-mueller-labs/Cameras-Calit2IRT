@@ -14,7 +14,6 @@ Solutions implemented:
 - Hungarian algorithm for optimal global assignment (prevents ID swaps on brush-by)
 - Velocity-predicted matching (predicts where each fly will be, not just where it was)
 - Stationary fly detection with extended lost-object window (prevents re-ID after rest)
-- Replaced KNN background subtraction with HSV color thresholding for dark flies on light bg
 '''
 
 import cv2
@@ -22,35 +21,31 @@ import numpy as np
 import random
 import csv
 from collections import deque
-from scipy.optimize import linear_sum_assignment  # Hungarian algorithm
+from scipy.optimize import linear_sum_assignment  # [FIX] Hungarian algorithm
 
-for name, min_contour_area in [
-                            # ("1x_bettercrop", 5),
-                            # ("1x_speed", 10),
-                            # ("20x_speed", 5),
-                            # ("plate_d1", 30),
-                            #   ("vial_closeup", 10), 
-                            #    ("vial_d3", 10), 
-                            #    ("vial_d2", 10), 
-                            #    ("vial_d5", 10)
-                            # ("120fps 2K.MXF", 30)
-                            ("2k 120fps backlit.MXF", 30)
-                            # ("4k 24fps.MXF", 30)
-                            # ("4k 60fps.MXF", 30)
-                               ]:
-    vid_path = f"SampleVideos/{name}"
+BASE_PATH="/Volumes/Crucial X9/Cameras-Calit2IRT/src/SampleVideos"
+
+for vid_path, min_contour_area in [
+        # (f"{BASE_PATH}/2k 120fps backlit.MXF", 30),
+        # (f"{BASE_PATH}/4k 24fps.MXF", 30),
+        (f"{BASE_PATH}/4k 60fps.MXF", 30), # src/SampleVideos/4k 60fps.MXF
+        (f"{BASE_PATH}/120fps 2K.MXF", 30),
+        (f"{BASE_PATH}/180fps 2K.MXF", 30),
+        (f"{BASE_PATH}/180fps more flys.MXF", 30)
+        ]:
+    name = vid_path.split('/')[-1]
     cap = cv2.VideoCapture(vid_path)
-    csv_name = f"./2D_Prototype/Tracked_{name}.csv"
+    csv_name = f"./2D_Detection/WatershedAlgorithm/Output/Velocity/Tracked_{name}_pwsVelocity.csv"
 
     # Get video properties
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    output_path = f'./2D_Prototype/WatershedAlgorithm/{name}_path_written_watershed_thresh.mp4'
+    output_path = f'./2D_Detection/WatershedAlgorithm/Output/Velocity/{name}_path_written_watershed_vel.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
-    # No more KNN background subtractor using HSV thresholding instead
+    backSub = cv2.createBackgroundSubtractorKNN()
 
     # Object tracking dictionaries
     next_object_id = 0
@@ -58,58 +53,22 @@ for name, min_contour_area in [
     lost_objects = {} # Temporarily store lost objects for recovery
     object_paths = {} # key = object_id, value = deque of (cx, cy) positions
     object_lifetimes = {} # key = object_id, value = number of frames seen
-    object_was_stationary = {}  # key = object_id, value = bool (was stationary when lost)
+    object_was_stationary = {} # key = object_id, value = bool (was stationary when lost)
     colors = {} # key = object_id, value = color
 
     # To store into CSV the different coordinates across frames and fly IDs
-    tracking_data = []  # List of dictionaries, one per frame
+    tracking_data = [] # List of dictionaries, one per frame
 
     # Tracking parameters
     MAX_LOST_FRAMES = 10 # how many frames to keep a moving lost object
-    STATIONARY_LOST_MULTIPLIER = 5 # multiply MAX_LOST_FRAMES for stationary flies
+    STATIONARY_LOST_MULTIPLIER = 5  # multiply MAX_LOST_FRAMES for stationary flies
     MIN_LIFETIME = 5 # min frames an object must be seen to be considered valid
     MAX_PATH_LENGTH = 50 # max number of points to keep in path history
     DISTANCE_THRESHOLD = 100 # max distance for matching
-    STATIONARY_THRESHOLD = 3.0 # pixel displacement below which a fly is "stationary"
+    STATIONARY_THRESHOLD = 3.0  # pixel displacement below which a fly is "stationary"
     VELOCITY_HISTORY = 5 # number of recent frames used to compute velocity
 
     CURRENT_TOTAL_FLIES = 0
-
-    # HSV at (906,476): [ 19 111 166] fly
-    # HSV at (913,474): [ 24 115 146]
-    # HSV at (907,477): [ 17 110 171]
-    # HSV at (903,482): [ 30 221 111]
-    # HSV at (922,466): [105  11 238]
-    # HSV at (827,481): [ 30  98 130]
-    # HSV at (827,488): [ 31  94 189]
-    # HSV at (823,492): [ 38  95 145]
-    # HSV at (826,515): [ 31  84 161]
-    # HSV at (831,515): [ 31  57 198]
-    # HSV at (731,652): [ 35 191 107]
-    # HSV at (738,658): [ 23 131 148]
-    # HSV at (744,662): [ 36 145 120] fly
-    # HSV at (1096,711): [105   2 255] bg
-    LOWER_BROWN = np.array([0,  50,  100])
-    UPPER_BROWN = np.array([40, 135, 200])
-
-    def get_fly_mask(frame):
-        """
-        Threshold for dark brown/black flies on a light background.
-        Works in HSV for better color separation than raw BGR.
-        Replaces KNN background subtraction entirely — stationary flies
-        will NOT be absorbed into the background model.
-        """
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-
-        mask_brown = cv2.inRange(hsv, LOWER_BROWN, UPPER_BROWN)
-        fg_mask = mask_brown
-
-        # Clean up noise: open removes small specks, close fills small gaps
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN,  kernel, iterations=1)
-        fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel, iterations=1)
-
-        return fg_mask
 
     def get_center(bbox):
         x, y, w, h = bbox
@@ -143,7 +102,7 @@ for name, min_contour_area in [
         px, py = predicted_center
         return np.sqrt((cx - px) ** 2 + (cy - py) ** 2)
 
-    # Stationary detection
+    # Stationary detection fcn
     def is_stationary(obj_id):
         """True if the fly has barely moved over the last VELOCITY_HISTORY frames."""
         if obj_id not in object_paths or len(object_paths[obj_id]) < VELOCITY_HISTORY:
@@ -162,9 +121,9 @@ for name, min_contour_area in [
         Costs are based on velocity-predicted positions.
 
         Returns:
-            matched          – list of (obj_id, bbox_index) pairs
-            unmatched_objs   – list of obj_ids with no good match
-            unmatched_bboxes – list of bbox indices with no assignment
+            matched = ist of (obj_id, bbox_index) pairs
+            unmatched_objs = list of obj_ids with no good match
+            unmatched_bboxes = list of bbox indices with no assignment
         """
         if not tracked_objs or not current_bboxes:
             return [], list(tracked_objs.keys()), list(range(len(current_bboxes)))
@@ -264,12 +223,12 @@ for name, min_contour_area in [
         ret, frame1 = cap.read()
 
         # Initialize first frame objects
-        fg_mask = get_fly_mask(frame1)  #  was: backSub.apply + Otsu threshold
+        fg_mask = backSub.apply(frame1)
+        ret, fg_mask = cv2.threshold(fg_mask, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         contours = apply_watershed_segmentation(fg_mask, frame1)
 
         max_contour_area = 25
-        large_contours = [cnt for cnt in contours
-                          if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
+        large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
 
         for cnt in large_contours:
             bbox = cv2.boundingRect(cnt)
@@ -295,25 +254,23 @@ for name, min_contour_area in [
 
             frame_count += 1
 
-            # HSV thresholding instead of KNN background subtraction
-            fg_mask = get_fly_mask(frame2)
+            # Background subtraction + threshold
+            fg_mask = backSub.apply(frame2)
+            ret, fg_mask = cv2.threshold(fg_mask, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
             # Watershed segmentation
             contours = apply_watershed_segmentation(fg_mask, frame2)
 
             min_contour_area = 25
             max_contour_area = 300
-            large_contours = [cnt for cnt in contours
-                              if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
+            large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
 
             current_bboxes = [cv2.boundingRect(cnt) for cnt in large_contours]
 
             new_tracked_objects = {}
 
             # Hungarian matching on currently tracked objects
-            matched, unmatched_obj_ids, unmatched_bbox_indices = match_objects_hungarian(
-                tracked_objects, current_bboxes, DISTANCE_THRESHOLD
-            )
+            matched, unmatched_obj_ids, unmatched_bbox_indices = match_objects_hungarian(tracked_objects, current_bboxes, DISTANCE_THRESHOLD)
 
             # Process successful matches
             for obj_id, bbox_idx in matched:
@@ -326,7 +283,7 @@ for name, min_contour_area in [
 
             # Unmatched tracked objects → move to lost_objects
             for obj_id in unmatched_obj_ids:
-                # Record whether this fly was stationary before losing it
+                # Record if this fly was stationary before losing it
                 stationary = is_stationary(obj_id)
                 object_was_stationary[obj_id] = stationary
                 extended_limit = (MAX_LOST_FRAMES * STATIONARY_LOST_MULTIPLIER
@@ -342,6 +299,7 @@ for name, min_contour_area in [
                     lost_objects[obj_id]['frames_lost'] += 1
 
             # Try to recover lost objects with remaining detections
+            # Build a mini cost matrix for lost objects vs unmatched bboxes
             remaining_bbox_indices = [i for i in unmatched_bbox_indices if i not in used_current]
             lost_to_remove = []
 
@@ -383,9 +341,7 @@ for name, min_contour_area in [
                 lost_objects.pop(obj_id, None)
                 object_was_stationary.pop(obj_id, None)
 
-            # ----------------------------------------------------------
-            # Step 3: Assign new IDs to truly unmatched detections
-            # ----------------------------------------------------------
+            # Assign new IDs to ACTUALLY unmatched detections
             for i, curr_bbox in enumerate(current_bboxes):
                 if i not in used_current:
                     new_tracked_objects[next_object_id] = curr_bbox
@@ -396,7 +352,7 @@ for name, min_contour_area in [
 
             tracked_objects = new_tracked_objects
 
-            # Store current frame data (only for objects with sufficient lifetime)
+            # Store current frame data (only for objects with correct lifetime)
             frame_data = {'frame': frame_count}
             for obj_id, bbox in tracked_objects.items():
                 if object_lifetimes.get(obj_id, 0) >= MIN_LIFETIME:
@@ -412,11 +368,9 @@ for name, min_contour_area in [
                     x, y, w, h = bbox
                     color = get_unique_color(obj_id)
                     frame2 = cv2.rectangle(frame2, (x, y), (x + w, y + h), color, 3)
-                    cv2.putText(frame2, f'ID:{obj_id}', (x, y - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+                    cv2.putText(frame2, f'ID:{obj_id}', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
-            cv2.putText(frame2, f'TOTAL FLIES: {CURRENT_TOTAL_FLIES}',
-                        (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 2)
+            cv2.putText(frame2, f'TOTAL FLIES: {CURRENT_TOTAL_FLIES}', (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 2)
 
             out.write(frame2)
 
@@ -424,7 +378,7 @@ for name, min_contour_area in [
                 valid_flies = sum(1 for obj_id in tracked_objects
                                   if object_lifetimes.get(obj_id, 0) >= MIN_LIFETIME)
                 print(f"{name} @ {frame_count} frames with {valid_flies} valid flies "
-                      f"(total tracked: {len(tracked_objects)})")
+                f"(total tracked: {len(tracked_objects)})")
 
     # Write tracking data to CSV
     if tracking_data:

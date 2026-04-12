@@ -19,28 +19,25 @@ import random
 import csv
 from collections import deque
 
-for name, min_contour_area in [
-                            # ("1x_bettercrop", 5),
-                            # ("1x_speed", 10),
-                            # ("20x_speed", 5),
-                            # ("plate_d1", 30),
-                            #   ("vial_closeup", 10), 
-                            #    ("vial_d3", 10), 
-                            #    ("vial_d2", 10), 
-                            #    ("vial_d5", 10)
-                            ("120fps 2K.MXF", 30)
-                            # ("4k 24fps.MXF", 30)
-                            # ("4k 60fps.MXF", 30)
-                               ]:
-    vid_path = f"SampleVideos/{name}"
+BASE_PATH="/Volumes/Crucial X9/Cameras-Calit2IRT/src/SampleVideos"
+
+for vid_path, min_contour_area in [
+        # (f"{BASE_PATH}/2k 120fps backlit.MXF", 30),
+        # (f"{BASE_PATH}/4k 24fps.MXF", 30),
+        (f"{BASE_PATH}/4k 60fps.MXF", 30), # src/SampleVideos/4k 60fps.MXF
+        (f"{BASE_PATH}/120fps 2K.MXF", 30),
+        (f"{BASE_PATH}/180fps 2K.MXF", 30),
+        (f"{BASE_PATH}/180fps more flys.MXF", 30)
+        ]:
     cap = cv2.VideoCapture(vid_path)
-    csv_name = f"./2D_Prototype/Tracked_{name}.csv"
+    name = vid_path.split('/')[-1]
+    csv_name = f"./2D_Detection/WatershedAlgorithm/Output/Pathing/Tracked_{name}_pws.csv"
 
     # Get video properties
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    output_path = f'./2D_Prototype/WatershedAlgorithm/{name}_path_written_watershed.mp4'
+    output_path = f'./2D_Detection/WatershedAlgorithm/Output/Pathing/{name}_path_written_watershed.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
@@ -148,8 +145,7 @@ for name, min_contour_area in [
         contours = apply_watershed_segmentation(fg_mask, frame1)
 
         max_contour_area = 25
-        large_contours = [cnt for cnt in contours
-                          if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
+        large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
 
         for cnt in large_contours:
             bbox = cv2.boundingRect(cnt)
