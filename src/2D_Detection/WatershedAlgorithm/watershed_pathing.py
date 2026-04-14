@@ -21,13 +21,15 @@ from collections import deque
 
 BASE_PATH="/Volumes/Crucial X9/Cameras-Calit2IRT/src/SampleVideos"
 
+save_flies = True
+
 for vid_path, min_contour_area in [
         # (f"{BASE_PATH}/2k 120fps backlit.MXF", 30),
         # (f"{BASE_PATH}/4k 24fps.MXF", 30),
-        (f"{BASE_PATH}/4k 60fps.MXF", 30), # src/SampleVideos/4k 60fps.MXF
+        # (f"{BASE_PATH}/4k 60fps.MXF", 30), # src/SampleVideos/4k 60fps.MXF
         (f"{BASE_PATH}/120fps 2K.MXF", 30),
-        (f"{BASE_PATH}/180fps 2K.MXF", 30),
-        (f"{BASE_PATH}/180fps more flys.MXF", 30)
+        # (f"{BASE_PATH}/180fps 2K.MXF", 30),
+        # (f"{BASE_PATH}/180fps more flys.MXF", 30)
         ]:
     cap = cv2.VideoCapture(vid_path)
     name = vid_path.split('/')[-1]
@@ -37,9 +39,14 @@ for vid_path, min_contour_area in [
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     output_path = f'./2D_Detection/WatershedAlgorithm/Output/Pathing/{name}_path_written_watershed.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+
+    # the two frames near the middle of the video to save the flies
+    mid = total_frames // 2
+    snapshot_frames = {mid, mid + 1}
 
     backSub = cv2.createBackgroundSubtractorKNN()
 
@@ -55,10 +62,10 @@ for vid_path, min_contour_area in [
     tracking_data = []  # List of dictionaries, one per frame
 
     # Tracking parameters
-    MAX_LOST_FRAMES = 10      # how many frames to keep lost objects for potential recovery
-    MIN_LIFETIME = 5          # min frames an object must be seen to be considered valid
-    MAX_PATH_LENGTH = 50      # max number of points to keep in path history
-    DISTANCE_THRESHOLD = 100  # max distance for matching (reduced from 200)
+    MAX_LOST_FRAMES = 10 # how many frames to keep lost objects for potential recovery
+    MIN_LIFETIME = 5 # min frames an object must be seen to be considered valid
+    MAX_PATH_LENGTH = 50 # max number of points to keep in path history
+    DISTANCE_THRESHOLD = 100 # max distance for matching (reduced from 200)
     RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
 
     CURRENT_TOTAL_FLIES = 0
@@ -134,6 +141,26 @@ for vid_path, min_contour_area in [
                 cv2.line(frame, points[i], points[i + 1], color, thickness)
             cv2.circle(frame, points[-1], 3, color, -1)
 
+    def save_fly_crops(frame, tracked_objects, object_lifetimes, frame_count, name):
+        """SAVE THE FLIES."""
+        for obj_id, bbox in tracked_objects.items():
+            if object_lifetimes.get(obj_id, 0) < MIN_LIFETIME:
+                continue
+            x, y, w, h = bbox
+            # Clamp to frame boundaries
+            x1 = max(0, x)
+            y1 = max(0, y)
+            x2 = min(frame.shape[1], x + w)
+            y2 = min(frame.shape[0], y + h)
+            crop = frame[y1:y2, x1:x2]
+            if crop.size == 0:
+                continue
+            crop_path = (
+                f"./2D_Detection/WatershedAlgorithm/Output/Pathing/"
+                f"fly_crop_{name}_frame{frame_count}_ID{obj_id}.png"
+            )
+            cv2.imwrite(crop_path, crop)
+
     if not cap.isOpened():
         print("Error video bad")
         exit()
@@ -177,8 +204,7 @@ for vid_path, min_contour_area in [
 
             min_contour_area = 25
             max_contour_area = 300
-            large_contours = [cnt for cnt in contours
-                              if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
+            large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt) < max_contour_area]
 
             current_bboxes = [cv2.boundingRect(cnt) for cnt in large_contours]
 
@@ -208,14 +234,13 @@ for vid_path, min_contour_area in [
                     cx, cy = get_center(current_bboxes[best_match_i])
                     object_paths[obj_id].append((cx, cy))
                 else:
-                    # Fly not matched — save its last known position for potential recovery
+                    # Fly not matched = save its last known position for potential recovery
                     if obj_id not in lost_objects:
                         lost_objects[obj_id] = {'bbox': prev_bbox, 'frames_lost': 1}
                     else:
                         lost_objects[obj_id]['frames_lost'] += 1
 
-            # [FIX] Step 2: For each unmatched detection, check lost_objects first
-            # before assigning a brand new ID.
+            # Step 2: For each unmatched detection, check lost_objects first before assigning a brand new ID.
             lost_to_remove = []
             for i, curr_bbox in enumerate(current_bboxes):
                 if i in used_current:
@@ -236,7 +261,7 @@ for vid_path, min_contour_area in [
                         best_lost_id = obj_id
 
                 if best_lost_id != -1 and best_lost_dist < RECOVERY_THRESHOLD:
-                    # Close enough — recover the old ID
+                    # Close enough = recover the old ID
                     new_tracked_objects[best_lost_id] = curr_bbox
                     used_current.add(i)
                     object_lifetimes[best_lost_id] += 1
@@ -247,7 +272,7 @@ for vid_path, min_contour_area in [
                           f"{best_lost_dist:.1f}px after "
                           f"{lost_objects[best_lost_id]['frames_lost']} lost frames")
                 else:
-                    # Truly new fly — assign a fresh ID
+                    # Truly new fly = assign a fresh ID
                     new_tracked_objects[next_object_id] = curr_bbox
                     object_lifetimes[next_object_id] = 1
                     cx, cy = get_center(curr_bbox)
@@ -275,14 +300,18 @@ for vid_path, min_contour_area in [
 
             # Draw paths and bounding boxes (only for objects with sufficient lifetime)
             CURRENT_TOTAL_FLIES = len(tracked_objects)
+
+            # save the flies in two middle frames BEFORE drawing on it
+            if save_flies and frame_count in snapshot_frames:
+                save_fly_crops(frame2, tracked_objects, object_lifetimes, frame_count, name)
+
             for obj_id, bbox in tracked_objects.items():
                 if object_lifetimes.get(obj_id, 0) >= MIN_LIFETIME:
                     draw_paths(frame2, object_paths, obj_id)
                     x, y, w, h = bbox
                     color = get_unique_color(obj_id)
                     frame2 = cv2.rectangle(frame2, (x, y), (x+w, y+h), color, 3)
-                    cv2.putText(frame2, f'ID:{obj_id}', (x, y-10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2)
+                    cv2.putText(frame2, f'ID:{obj_id}', (x, y-10),cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2)
             cv2.putText(frame2, f'TOTAL FLIES: {CURRENT_TOTAL_FLIES}', (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 2)
 
             out.write(frame2)
