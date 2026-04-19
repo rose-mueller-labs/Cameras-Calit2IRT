@@ -31,7 +31,7 @@ def get_center(bbox):
 def get_fg_mask(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # The interior is very bright white
-    _, white_region = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)
+    _, white_region = cv2.threshold(gray, 177, 255, cv2.THRESH_BINARY)
     
     # Find the largest contour = the white arena interior
     contours, _ = cv2.findContours(white_region, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -42,6 +42,7 @@ def get_fg_mask(frame):
         # Erode slightly to avoid picking up edge artifacts
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (20, 20))
         arena_mask = cv2.erode(arena_mask, kernel, iterations=1)
+    cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/arena_mask_{name}.png", arena_mask)
 
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     fly_mask = cv2.inRange(rgb, LOWER_BROWN, UPPER_BROWN)
@@ -71,7 +72,7 @@ def draw_paths(frame, paths, obj_id):
 
 BASE_PATH="/Volumes/Crucial X9/Cameras-Calit2IRT/src/SampleVideos/Backlit"
 
-LOWER_BROWN = np.array([0,  85,  0])
+LOWER_BROWN = np.array([0,  70,  0])
 UPPER_BROWN = np.array([215, 200, 138]) # works for all flies except the one in the rightside
 MAX_LOST_FRAMES = 10 # how many frames to keep a moving lost object
 MIN_LIFETIME = 5 # min frames an object must be seen to be considered valid
@@ -89,7 +90,7 @@ for vid_path, min_contour_area in [
         # (f"{BASE_PATH}/4k 24fps.MXF", 30),
         # (f"{BASE_PATH}/4k 60fps.MXF", 30), # src/SampleVideos/4k 60fps.MXF
         # (f"{BASE_PATH}/120fps 2K.MXF", 30),
-        (f"{BASE_PATH}/4k 30fps box.MOV", 30)
+        (f"{BASE_PATH}/4k 30fps box.MOV", 20)
         # (f"{BASE_PATH}/180fps 2K.MXF", 30),
         # (f"{BASE_PATH}/180fps more flys.MXF", 30)
         ]:
@@ -126,6 +127,9 @@ for vid_path, min_contour_area in [
     else:
         # Capture frame-by-frame
         ret, frame = cap.read()
+        rgbframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # plt.imshow(rgbframe)
+        # plt.show()
         if ret or frame_count <= fps * STOP_SEC:
             fg_mask = get_fg_mask(frame)
             cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_debug_mask_pwsBacklit.png", fg_mask)
@@ -138,7 +142,7 @@ for vid_path, min_contour_area in [
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         mask_eroded = cv2.morphologyEx(mask_thresh, cv2.MORPH_OPEN, kernel)
 
-        min_contour_area = 10
+        # = 20
         large_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_area]
 
         for cnt in large_contours:
@@ -169,6 +173,7 @@ for vid_path, min_contour_area in [
             frame_count += 1
 
             fg_mask = get_fg_mask(frame2)
+            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_debug_mask_pwsBacklit.png", fg_mask)
 
             contours, hierarchy = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             frame_ct = cv2.drawContours(frame, contours, -1, (0, 255, 0), 2)
@@ -176,7 +181,7 @@ for vid_path, min_contour_area in [
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             mask_eroded = cv2.morphologyEx(mask_thresh, cv2.MORPH_OPEN, kernel)
 
-            min_contour_area = 10
+            #min_contour_area = 20
             large_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_area]
 
             current_bboxes = [cv2.boundingRect(cnt) for cnt in large_contours]
