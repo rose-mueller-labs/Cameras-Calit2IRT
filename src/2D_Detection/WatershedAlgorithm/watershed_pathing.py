@@ -66,7 +66,7 @@ for vid_path, min_contour_area in [
     MAX_LOST_FRAMES = 10 # how many frames to keep lost objects for potential recovery
     MIN_LIFETIME = 5 # min frames an object must be seen to be considered valid
     MAX_PATH_LENGTH = 50 # max number of points to keep in path history
-    DISTANCE_THRESHOLD = 100 # max distance for matching (reduced from 200)
+    DISTANCE_THRESHOLD = 50 # max distance for matching (reduced from 200)
     RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
 
     CURRENT_TOTAL_FLIES = 0
