@@ -21,13 +21,14 @@ from collections import deque
 
 BASE_PATH="/Volumes/Crucial X9/Cameras-Calit2IRT/src/SampleVideos"
 
-save_flies = True
+save_flies = False
 
 for vid_path, min_contour_area in [
         # (f"{BASE_PATH}/2k 120fps backlit.MXF", 30),
         # (f"{BASE_PATH}/4k 24fps.MXF", 30),
         # (f"{BASE_PATH}/4k 60fps.MXF", 30), # src/SampleVideos/4k 60fps.MXF
-        (f"{BASE_PATH}/120fps 2K.MXF", 30),
+        # (f"{BASE_PATH}/120fps 2K.MXF", 30),
+        (f"{BASE_PATH}/Backlit/4k 30fps box.MOV", 30)
         # (f"{BASE_PATH}/180fps 2K.MXF", 30),
         # (f"{BASE_PATH}/180fps more flys.MXF", 30)
         ]:
@@ -193,7 +194,7 @@ for vid_path, min_contour_area in [
 
         while cap.isOpened():
             ret, frame2 = cap.read()
-            if not ret:
+            if not ret or frame_count >= fps * 5:
                 break
 
             frame_count += 1
