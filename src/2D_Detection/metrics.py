@@ -28,7 +28,7 @@ if __name__ == '__main__':
     video_test_csv_path = input("What is the video test csv output's path (e.g. ./WatershedAlgorithm/Output/Pathing/Tracked_2k 120fps backlit.MXF_pws.csv): ")
     name = video_test_csv_path.split("/")[-1].split('.csv')[0].split('.')[0].split('_')[-1]
     print(name)
-    video_test_name = f"{video_test_csv_path.split("/")[-1].split('.csv')[0].split('.')[0].split('_')[-1]}.MXF"
+    video_test_name = f"{video_test_csv_path.split("/")[-1].split('.csv')[0].split('.')[0].split('_')[-1]}.MOV"
     alg_used = video_test_csv_path.split("/")[-1].split('.csv')[0].split('.')[-1].split("_")[-1]
 
     UPDATE_CSV_PATH=f"./2D_Detection/performance_{alg_used}.csv"

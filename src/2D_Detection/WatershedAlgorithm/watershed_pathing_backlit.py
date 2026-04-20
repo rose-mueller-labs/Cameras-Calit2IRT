@@ -1,6 +1,8 @@
 '''
 TODO:
-
+- In petri dish backlist videos since there's no tape to distinguish the end, the borders on the right
+get detected as contours/part of it. --> need to tweak the arena_mask to remove large contours
+or decrease max_contour_size after we get contours from the fly_mask.
 '''
 
 import cv2
@@ -77,22 +79,22 @@ UPPER_BROWN = np.array([215, 200, 138]) # works for all flies except the one in 
 MAX_LOST_FRAMES = 10 # how many frames to keep a moving lost object
 MIN_LIFETIME = 5 # min frames an object must be seen to be considered valid
 MAX_PATH_LENGTH = 50 # max number of points to keep in path history
-DISTANCE_THRESHOLD = 50 # 90 to minimize flying = new ID issue.
+DISTANCE_THRESHOLD = 200 # 90 to minimize flying = new ID issue.
 RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
 
-STOP_SEC = 10
+MAX_CONTOUR_AREA = 100
+
+STOP_SEC = 5
 
 
 CURRENT_TOTAL_FLIES = 0
 
 for vid_path, min_contour_area in [
-        # (f"{BASE_PATH}/2k 120fps backlit.MXF", 30),
-        # (f"{BASE_PATH}/4k 24fps.MXF", 30),
-        # (f"{BASE_PATH}/4k 60fps.MXF", 30), # src/SampleVideos/4k 60fps.MXF
-        # (f"{BASE_PATH}/120fps 2K.MXF", 30),
-        (f"{BASE_PATH}/4k 30fps box.MOV", 20)
-        # (f"{BASE_PATH}/180fps 2K.MXF", 30),
-        # (f"{BASE_PATH}/180fps more flys.MXF", 30)
+        # (f"{BASE_PATH}/2k 120fps backlit.MXF", 20),
+        # (f"{BASE_PATH}/4k 30fps box.MOV", 20),
+        (f"{BASE_PATH}/4k 30fps Petri dish.MOV", 20),
+        (f"{BASE_PATH}/4k 120fps Petri dish.MOV", 20),
+        (f"{BASE_PATH}/4k 120fps box.MOV", 20) # to run
         ]:
     cap = cv2.VideoCapture(vid_path)
     name = vid_path.split('/')[-1]
@@ -119,7 +121,7 @@ for vid_path, min_contour_area in [
     colors = {} # key = object_id, value = color
 
     # To store into CSV the different coordinates across frames and fly IDs
-    tracking_data = []  # List of dictionaries, one per frame
+    tracking_data = [] # List of dictionaries, one per frame
 
     if not cap.isOpened():
         print("Error opening video file")
@@ -143,7 +145,7 @@ for vid_path, min_contour_area in [
         mask_eroded = cv2.morphologyEx(mask_thresh, cv2.MORPH_OPEN, kernel)
 
         # = 20
-        large_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_area]
+        large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt) < MAX_CONTOUR_AREA]
 
         for cnt in large_contours:
             bbox = cv2.boundingRect(cnt)
@@ -159,7 +161,7 @@ for vid_path, min_contour_area in [
         frame_data = {'frame': 0}
         for obj_id, bbox in tracked_objects.items():
             cx, cy = get_center(bbox)
-            frame_data[f'ID_{obj_id}'] = f'({cx},{cy})'
+            frame_data[f'ID_{obj_id}'] = f'({cx}!{cy})'
         tracking_data.append(frame_data)
 
         print(f"Starting tracking with {len(tracked_objects)} initial flies detected")
@@ -182,7 +184,7 @@ for vid_path, min_contour_area in [
             mask_eroded = cv2.morphologyEx(mask_thresh, cv2.MORPH_OPEN, kernel)
 
             #min_contour_area = 20
-            large_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_area]
+            large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt) < MAX_CONTOUR_AREA]
 
             current_bboxes = [cv2.boundingRect(cnt) for cnt in large_contours]
 
@@ -274,7 +276,7 @@ for vid_path, min_contour_area in [
             for obj_id, bbox in tracked_objects.items():
                 if object_lifetimes.get(obj_id, 0) >= MIN_LIFETIME:
                     cx, cy = get_center(bbox)
-                    frame_data[f'ID_{obj_id}'] = f'({cx},{cy})'
+                    frame_data[f'ID_{obj_id}'] = f'({cx}!{cy})'
             tracking_data.append(frame_data)
 
             # Draw paths and bounding boxes (only for objects with sufficient lifetime)
