@@ -12,6 +12,27 @@ import csv
 from collections import deque
 import matplotlib.pyplot as plt
 
+
+def save_fly_crops(frame, tracked_objects, object_lifetimes, frame_count, name):
+        """SAVE THE FLIES."""
+        for obj_id, bbox in tracked_objects.items():
+            if object_lifetimes.get(obj_id, 0) < MIN_LIFETIME:
+                continue
+            x, y, w, h = bbox
+            # Clamp to frame boundaries
+            x1 = max(0, x)
+            y1 = max(0, y)
+            x2 = min(frame.shape[1], x + w)
+            y2 = min(frame.shape[0], y + h)
+            crop = frame[y1:y2, x1:x2]
+            if crop.size == 0:
+                continue
+            crop_path = (
+                f"./2D_Detection/WatershedAlgorithm/Output/Backlit/"
+                f"fly_crop_{name}_frame{frame_count}_ID{obj_id}.png"
+            )
+            cv2.imwrite(crop_path, crop)
+
 def get_unique_color(obj_id):
     if obj_id not in colors:
         r = random.randint(0, 255)
@@ -82,7 +103,7 @@ MAX_PATH_LENGTH = 50 # max number of points to keep in path history
 DISTANCE_THRESHOLD = 200 # 90 to minimize flying = new ID issue.
 RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
 
-MAX_CONTOUR_AREA = 100
+MAX_CONTOUR_AREA = 200
 
 STOP_SEC = 5
 
@@ -91,10 +112,12 @@ CURRENT_TOTAL_FLIES = 0
 
 for vid_path, min_contour_area in [
         # (f"{BASE_PATH}/2k 120fps backlit.MXF", 20),
-        # (f"{BASE_PATH}/4k 30fps box.MOV", 20),
-        (f"{BASE_PATH}/4k 30fps Petri dish.MOV", 20),
-        (f"{BASE_PATH}/4k 120fps Petri dish.MOV", 20),
-        (f"{BASE_PATH}/4k 120fps box.MOV", 20) # to run
+        (f"{BASE_PATH}/4k 30fps box.MOV", 20),
+        
+        # (f"{BASE_PATH}/4k 30fps Petri dish.MOV", 20),
+        # (f"{BASE_PATH}/4k 120fps Petri dish.MOV", 20),
+        
+        # (f"{BASE_PATH}/4k 120fps box.MOV", 20) # to run
         ]:
     cap = cv2.VideoCapture(vid_path)
     name = vid_path.split('/')[-1]
@@ -108,6 +131,11 @@ for vid_path, min_contour_area in [
     output_path = f'./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_pwsBacklit.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+
+    save_flies = False
+
+    mid = total_frames // 2
+    snapshot_frames = {mid, mid + 1}
     
     frame_count = 0
 
@@ -145,7 +173,7 @@ for vid_path, min_contour_area in [
         mask_eroded = cv2.morphologyEx(mask_thresh, cv2.MORPH_OPEN, kernel)
 
         # = 20
-        large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt) < MAX_CONTOUR_AREA]
+        large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt)]
 
         for cnt in large_contours:
             bbox = cv2.boundingRect(cnt)
@@ -156,7 +184,7 @@ for vid_path, min_contour_area in [
             next_object_id += 1
             x, y, w, h = bbox
             frame_written = cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 200), 3)
-        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_cnt_mask_pwsBacklit.png", frame_written)
+            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_cnt_mask_pwsBacklit.png", frame_written)
 
         frame_data = {'frame': 0}
         for obj_id, bbox in tracked_objects.items():
@@ -184,7 +212,7 @@ for vid_path, min_contour_area in [
             mask_eroded = cv2.morphologyEx(mask_thresh, cv2.MORPH_OPEN, kernel)
 
             #min_contour_area = 20
-            large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt) < MAX_CONTOUR_AREA]
+            large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt)]
 
             current_bboxes = [cv2.boundingRect(cnt) for cnt in large_contours]
 
@@ -282,12 +310,16 @@ for vid_path, min_contour_area in [
             # Draw paths and bounding boxes (only for objects with sufficient lifetime)
             CURRENT_TOTAL_FLIES = len(tracked_objects)
 
+            if save_flies:
+                save_fly_crops(frame2, tracked_objects, object_lifetimes, frame_count, name)
+
             for obj_id, bbox in tracked_objects.items():
                 if object_lifetimes.get(obj_id, 0) >= MIN_LIFETIME:
                     draw_paths(frame2, object_paths, obj_id)
                     x, y, w, h = bbox
                     color = get_unique_color(obj_id)
                     frame2 = cv2.rectangle(frame2, (x, y), (x+w, y+h), color, 3)
+
                     cv2.putText(frame2, f'ID:{obj_id}', (x, y-10),cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2)
             cv2.putText(frame2, f'TOTAL FLIES: {CURRENT_TOTAL_FLIES}', (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 2)
 
