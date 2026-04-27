@@ -11,6 +11,7 @@ import random
 import csv
 from collections import deque
 import matplotlib.pyplot as plt
+import math
 
 
 def save_fly_crops(frame, tracked_objects, object_lifetimes, frame_count, name):
@@ -51,6 +52,40 @@ def get_center(bbox):
     x, y, w, h = bbox
     return (x + w // 2, y + h // 2)
 
+def apply_watershed_segmentation(sure_fg, sure_bg, original_frame):
+        """
+        https://www.geeksforgeeks.org/computer-vision/image-segmentation-with-watershed-algorithm-opencv-python/
+        1. Noise removal with morphological operations
+        2. Sure background detection (dilation)
+        3. Distance transform for sure foreground
+        4. Unknown region calculation
+        5. Marker labeling
+        6. Watershed application
+        """
+            
+        sure_fg = np.uint8(sure_fg)
+        unknown = cv2.subtract(sure_bg, sure_fg)
+        ret, markers = cv2.connectedComponents(sure_fg)
+        markers = markers + 1
+        markers[unknown == 255] = 0
+
+        if len(original_frame.shape) == 2:
+            original_frame_3ch = cv2.cvtColor(original_frame, cv2.COLOR_GRAY2BGR)
+        else:
+            original_frame_3ch = original_frame.copy()
+
+        markers = cv2.watershed(original_frame_3ch, markers)
+        labels = np.unique(markers)
+        contours_list = []
+
+        for label in labels[2:]:
+            target = np.where(markers == label, 255, 0).astype(np.uint8)
+            contours, hierarchy = cv2.findContours(target, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if len(contours) > 0:
+                contours_list.append(contours[0])
+
+        return contours_list
+
 def get_fg_mask(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # The interior is very bright white
@@ -63,7 +98,7 @@ def get_fg_mask(frame):
         largest = max(contours, key=cv2.contourArea)
         cv2.drawContours(arena_mask, [largest], -1, 255, thickness=cv2.FILLED)
         # Erode slightly to avoid picking up edge artifacts
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (20, 20))
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (53, 53))
         arena_mask = cv2.erode(arena_mask, kernel, iterations=1)
     cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/arena_mask_{name}.png", arena_mask)
 
@@ -76,7 +111,7 @@ def get_fg_mask(frame):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     fly_mask = cv2.morphologyEx(fly_mask, cv2.MORPH_OPEN, kernel, iterations=1)
     fly_mask = cv2.morphologyEx(fly_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
-    return fly_mask
+    return fly_mask, arena_mask
 
 def calculate_distance(bbox1, bbox2):
     x1, y1 = get_center(bbox1)
@@ -93,31 +128,59 @@ def draw_paths(frame, paths, obj_id):
             cv2.line(frame, points[i], points[i + 1], color, thickness)
         cv2.circle(frame, points[-1], 3, color, -1)
 
+def get_good_cnts(contours, frame):
+    large_contours = []
+    disp_frm = frame.copy()
+    for i, cnt in enumerate(contours):
+        cnt_ar = cv2.contourArea(cnt)
+        perimeter = cv2.arcLength(cnt, True)
+        circularity = (4 * 3.14 * cnt_ar) / (perimeter ** 2)
+
+        x, y, w, h = cv2.boundingRect(cnt)
+        eccentricity = (math.sqrt(abs(w**2-h**2)))/w
+
+        thing = frame[y:y+h,x:x+w]
+        avg_color_per_row = np.average(thing, axis=0)
+        avg_color = np.average(avg_color_per_row, axis=0)
+        brightness = np.mean(avg_color)
+
+        if cnt_ar < min_contour_area or cnt_ar > MAX_CONTOUR_AREA:
+            continue
+        if perimeter == 0:
+            continue
+        if circularity > 0.70 or circularity < 0.30:
+            continue
+    
+        disp_frm = cv2.rectangle(disp_frm, (x, y), (x+w, y+h), (0, 0, 200), 3)
+        disp_frm = cv2.putText(disp_frm, f'{avg_color}', (x+10, y-10),cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,0), 2)    
+    
+        large_contours.append(cnt)
+
+    return large_contours, disp_frm
+
 BASE_PATH="/Volumes/Crucial X9/Cameras-Calit2IRT/src/SampleVideos/Backlit"
 
-LOWER_BROWN = np.array([0,  70,  0])
-UPPER_BROWN = np.array([215, 200, 138]) # works for all flies except the one in the rightside
+LOWER_BROWN = np.array([0,  70,   0])
+UPPER_BROWN = np.array([215, 175, 138]) # works for all flies except the one in the rightside
 MAX_LOST_FRAMES = 10 # how many frames to keep a moving lost object
 MIN_LIFETIME = 5 # min frames an object must be seen to be considered valid
 MAX_PATH_LENGTH = 50 # max number of points to keep in path history
-DISTANCE_THRESHOLD = 200 # 90 to minimize flying = new ID issue.
-RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
+# DISTANCE_THRESHOLD = 90 # 90 to minimize flying = new ID issue.
 
-MAX_CONTOUR_AREA = 200
+MAX_CONTOUR_AREA = 1100
 
-STOP_SEC = 5
-
+STOP_SEC = 1000000000000
 
 CURRENT_TOTAL_FLIES = 0
 
-for vid_path, min_contour_area in [
-        # (f"{BASE_PATH}/2k 120fps backlit.MXF", 20),
-        (f"{BASE_PATH}/4k 30fps box.MOV", 20),
+for vid_path, min_contour_area, LOWER_BOUND_CROP, DISTANCE_THRESHOLD in [
+        # (f"{BASE_PATH}/2k 120fps backlit.MXF", 20, -1, 200),
+        # (f"{BASE_PATH}/4k 30fps box.MOV", 20, -1, 200), # got perfect results
         
-        # (f"{BASE_PATH}/4k 30fps Petri dish.MOV", 20),
-        # (f"{BASE_PATH}/4k 120fps Petri dish.MOV", 20),
+        # (f"{BASE_PATH}/4k 30fps Petri dish.MOV", 20, -1, 200),
+        # (f"{BASE_PATH}/4k 120fps Petri dish.MOV", 20, -1, 200),
         
-        # (f"{BASE_PATH}/4k 120fps box.MOV", 20) # to run
+        (f"{BASE_PATH}/4k 120fps box.MOV", 350, 3000, 90) # TODO: Velocity implementation for flying
         ]:
     cap = cv2.VideoCapture(vid_path)
     name = vid_path.split('/')[-1]
@@ -130,7 +193,10 @@ for vid_path, min_contour_area in [
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     output_path = f'./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_pwsBacklit.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+    RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
+    
+    if LOWER_BOUND_CROP != -1:
+        out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, LOWER_BOUND_CROP))
 
     save_flies = False
 
@@ -157,23 +223,29 @@ for vid_path, min_contour_area in [
     else:
         # Capture frame-by-frame
         ret, frame = cap.read()
+        frame = frame[:LOWER_BOUND_CROP, :]
         rgbframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # plt.imshow(rgbframe)
         # plt.show()
         if ret or frame_count <= fps * STOP_SEC:
-            fg_mask = get_fg_mask(frame)
+            fg_mask, bg_mask = get_fg_mask(frame)
+            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_bg_mask_pwsBacklit.png", bg_mask)
             cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_debug_mask_pwsBacklit.png", fg_mask)
         if not ret or frame_count >= fps * STOP_SEC:
             break
-
-        contours, hierarchy = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+        watershed_cnts = apply_watershed_segmentation(fg_mask, bg_mask, frame)
+        
+        # contours, hierarchy = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = watershed_cnts
         frame_ct = cv2.drawContours(frame, contours, -1, (0, 255, 0), 2)
         retval, mask_thresh = cv2.threshold( fg_mask, 127, 255, cv2.THRESH_BINARY)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         mask_eroded = cv2.morphologyEx(mask_thresh, cv2.MORPH_OPEN, kernel)
 
-        # = 20
-        large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt)]
+        large_contours, disp_frm = get_good_cnts(contours, frame)
+        # plt.imshow(cv2.cvtColor(disp_frm, cv2.COLOR_BGR2RGB))
+        # plt.show()
 
         for cnt in large_contours:
             bbox = cv2.boundingRect(cnt)
@@ -200,20 +272,25 @@ for vid_path, min_contour_area in [
             ret, frame2 = cap.read()
             if not ret or frame_count >= fps * STOP_SEC:
                 break
+            frame2 = frame2[:LOWER_BOUND_CROP, :]
             frame_count += 1
 
-            fg_mask = get_fg_mask(frame2)
+            fg_mask, bg_mask = get_fg_mask(frame2)
             cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_debug_mask_pwsBacklit.png", fg_mask)
 
-            contours, hierarchy = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            watershed_cnts = apply_watershed_segmentation(fg_mask, bg_mask, frame2)
+            
+            # contours, hierarchy = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours = watershed_cnts
             frame_ct = cv2.drawContours(frame, contours, -1, (0, 255, 0), 2)
             retval, mask_thresh = cv2.threshold( fg_mask, 127, 255, cv2.THRESH_BINARY)
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             mask_eroded = cv2.morphologyEx(mask_thresh, cv2.MORPH_OPEN, kernel)
 
-            #min_contour_area = 20
-            large_contours = [cnt for cnt in contours if min_contour_area < cv2.contourArea(cnt)]
-
+            large_contours, disp_frm = get_good_cnts(contours, frame2)
+            
+            # plt.imshow(cv2.cvtColor(disp_frm, cv2.COLOR_BGR2RGB))
+            # plt.show()
             current_bboxes = [cv2.boundingRect(cnt) for cnt in large_contours]
 
             new_tracked_objects = {} # from now on, what's different?
@@ -292,8 +369,7 @@ for vid_path, min_contour_area in [
             for obj_id in lost_to_remove:
                 del lost_objects[obj_id]
 
-            expired = [obj_id for obj_id, data in lost_objects.items()
-                       if data['frames_lost'] > MAX_LOST_FRAMES]
+            expired = [obj_id for obj_id, data in lost_objects.items() if data['frames_lost'] > MAX_LOST_FRAMES]
             for obj_id in expired:
                 del lost_objects[obj_id]
 
