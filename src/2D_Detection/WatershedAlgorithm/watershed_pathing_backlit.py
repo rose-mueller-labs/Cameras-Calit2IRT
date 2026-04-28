@@ -12,6 +12,7 @@ import csv
 from collections import deque
 import matplotlib.pyplot as plt
 import math
+import os
 
 
 def save_fly_crops(frame, tracked_objects, object_lifetimes, frame_count, name):
@@ -158,7 +159,8 @@ def get_good_cnts(contours, frame):
 
     return large_contours, disp_frm
 
-BASE_PATH="/Volumes/Crucial X9/Cameras-Calit2IRT/src/SampleVideos/Backlit"
+# BASE_PATH="/Volumes/Crucial X9/Cameras-Calit2IRT/src/SampleVideos/Backlit"
+BASE_PATH="/Volumes/Crucial X9/Downloads/UROP Data Colletion 4-26-2026"
 
 LOWER_BROWN = np.array([0,  70,   0])
 UPPER_BROWN = np.array([215, 175, 138]) # works for all flies except the one in the rightside
@@ -173,30 +175,48 @@ STOP_SEC = 1000000000000
 
 CURRENT_TOTAL_FLIES = 0
 
-for vid_path, min_contour_area, LOWER_BOUND_CROP, DISTANCE_THRESHOLD in [
-        # (f"{BASE_PATH}/2k 120fps backlit.MXF", 20, -1, 200),
-        # (f"{BASE_PATH}/4k 30fps box.MOV", 20, -1, 200), # got perfect results
+# for vid_path, min_contour_area, LOWER_BOUND_CROP, DISTANCE_THRESHOLD in [
+#         # (f"{BASE_PATH}/2k 120fps backlit.MXF", 20, -1, 200),
+#         # (f"{BASE_PATH}/4k 30fps box.MOV", 20, -1, 200), # got perfect results
         
-        # (f"{BASE_PATH}/4k 30fps Petri dish.MOV", 20, -1, 200),
-        # (f"{BASE_PATH}/4k 120fps Petri dish.MOV", 20, -1, 200),
+#         # (f"{BASE_PATH}/4k 30fps Petri dish.MOV", 20, -1, 200),
+#         # (f"{BASE_PATH}/4k 120fps Petri dish.MOV", 20, -1, 200),
         
-        (f"{BASE_PATH}/4k 120fps box.MOV", 350, 3000, 90) # TODO: Velocity implementation for flying
-        ]:
+#         # (f"{BASE_PATH}/4k 120fps box.MOV", 350, 3000, 90) # TODO: Velocity implementation for flying
+#         ]:
+
+print(os.listdir(BASE_PATH))
+for vid_name in os.listdir(BASE_PATH):
+    if vid_name[0] == '.' or vid_name == 'ACO1.MOV' or vid_name == 'procedure.heic' or vid_name == 'CACO4_short.MOV' or vid_name == 'CO3.MOV' or vid_name == 'ACO5.MOV' or vid_name == 'CAO4.MOV':
+        continue
+    # vid_name = 'CO2.MOV'
+    vid_path = f"{BASE_PATH}/{vid_name}"
+    
+    DISTANCE_THRESHOLD = 90
+    LOWER_BOUND_CROP = 2747
+    UPPER_BOUND_CROP = 1200
+    WIDTH_BOUND = 1600
+    WIDTH_L_BOUND = 300
+    min_contour_area = 200
     cap = cv2.VideoCapture(vid_path)
     name = vid_path.split('/')[-1]
-    csv_name = f"./2D_Detection/WatershedAlgorithm/Output/Backlit/Tracked_{name}_pwsBacklit.csv"
+    csv_name = f"./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/Tracked_{name}_pwsBacklit.csv"
 
     # Get video properties
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    output_path = f'./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_pwsBacklit.mp4'
+    output_path = f'./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/{name}_pwsBacklit.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
+    out = cv2.VideoWriter(output_path, fourcc, fps, (WIDTH_BOUND-WIDTH_L_BOUND, LOWER_BOUND_CROP-UPPER_BOUND_CROP))
     
-    if LOWER_BOUND_CROP != -1:
-        out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, LOWER_BOUND_CROP))
+    # if WIDTH_BOUND != -1:
+    #     out = cv2.VideoWriter(output_path, fourcc, fps, (WIDTH_BOUND, frame_height))
+    
+    # if LOWER_BOUND_CROP != -1:
+    #     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, LOWER_BOUND_CROP))
 
     save_flies = False
 
@@ -223,14 +243,21 @@ for vid_path, min_contour_area, LOWER_BOUND_CROP, DISTANCE_THRESHOLD in [
     else:
         # Capture frame-by-frame
         ret, frame = cap.read()
-        frame = frame[:LOWER_BOUND_CROP, :]
-        rgbframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # if LOWER_BOUND_CROP != -1:
+        #     frame = frame[:LOWER_BOUND_CROP, :]
+        # if WIDTH_BOUND != -1:
+        #     frame = frame[:, :WIDTH_BOUND]
+        # rgbframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # plt.imshow(rgbframe)
+        # plt.show()
+        frame = frame[UPPER_BOUND_CROP:LOWER_BOUND_CROP, WIDTH_L_BOUND:WIDTH_BOUND]
+        # rgbframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # plt.imshow(rgbframe)
         # plt.show()
         if ret or frame_count <= fps * STOP_SEC:
             fg_mask, bg_mask = get_fg_mask(frame)
-            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_bg_mask_pwsBacklit.png", bg_mask)
-            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_debug_mask_pwsBacklit.png", fg_mask)
+            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/{name}_bg_mask_pwsBacklit.png", bg_mask)
+            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/{name}_debug_mask_pwsBacklit.png", fg_mask)
         if not ret or frame_count >= fps * STOP_SEC:
             break
             
@@ -256,7 +283,7 @@ for vid_path, min_contour_area, LOWER_BOUND_CROP, DISTANCE_THRESHOLD in [
             next_object_id += 1
             x, y, w, h = bbox
             frame_written = cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 200), 3)
-            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_cnt_mask_pwsBacklit.png", frame_written)
+            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/{name}_cnt_mask_pwsBacklit.png", frame_written)
 
         frame_data = {'frame': 0}
         for obj_id, bbox in tracked_objects.items():
@@ -272,11 +299,15 @@ for vid_path, min_contour_area, LOWER_BOUND_CROP, DISTANCE_THRESHOLD in [
             ret, frame2 = cap.read()
             if not ret or frame_count >= fps * STOP_SEC:
                 break
-            frame2 = frame2[:LOWER_BOUND_CROP, :]
+            # if LOWER_BOUND_CROP != -1:
+            #     frame2 = frame2[:LOWER_BOUND_CROP, :]
+            # if WIDTH_BOUND != -1:
+            #     frame2 = frame2[:, :WIDTH_BOUND]
+            frame2 = frame2[UPPER_BOUND_CROP:LOWER_BOUND_CROP, WIDTH_L_BOUND:WIDTH_BOUND]
             frame_count += 1
 
             fg_mask, bg_mask = get_fg_mask(frame2)
-            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{name}_debug_mask_pwsBacklit.png", fg_mask)
+            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/{name}_debug_mask_pwsBacklit.png", fg_mask)
 
             watershed_cnts = apply_watershed_segmentation(fg_mask, bg_mask, frame2)
             
