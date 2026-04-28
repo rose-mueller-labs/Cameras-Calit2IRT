@@ -171,7 +171,7 @@ MAX_PATH_LENGTH = 50 # max number of points to keep in path history
 
 MAX_CONTOUR_AREA = 1100
 
-STOP_SEC = 1000000000000
+STOP_SEC = 300
 
 CURRENT_TOTAL_FLIES = 0
 
