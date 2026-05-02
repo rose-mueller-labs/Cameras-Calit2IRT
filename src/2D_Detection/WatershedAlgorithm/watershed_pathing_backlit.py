@@ -171,7 +171,7 @@ MAX_PATH_LENGTH = 50 # max number of points to keep in path history
 
 MAX_CONTOUR_AREA = 1100
 
-STOP_SEC = 300
+STOP_SEC = 60
 
 CURRENT_TOTAL_FLIES = 0
 
@@ -192,7 +192,7 @@ for vid_name in os.listdir(BASE_PATH):
     # vid_name = 'CO2.MOV'
     vid_path = f"{BASE_PATH}/{vid_name}"
     
-    DISTANCE_THRESHOLD = 90
+    DISTANCE_THRESHOLD = 90 # CAO5
     LOWER_BOUND_CROP = 2747
     UPPER_BOUND_CROP = 1200
     WIDTH_BOUND = 1600

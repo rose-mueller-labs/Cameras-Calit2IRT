@@ -1,18 +1,10 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-
-df = pd.read_csv("./WatershedAlgorithm/Output/Backlit/UROPVids/Tracked_ACO1.MOV_pwsBacklit.csv")
-
-print(df.head())
-
-# delete first 4 frames
-df = df.iloc[4:].reset_index(drop=True)
-
-id_cols = [c for c in df.columns if c.startswith("ID_")]
+import cv2
+from scipy.stats import ttest_ind
 
 def parse_coord(s):
-    '''cuz it's ! i want it to be ,'''
     try:
         s = str(s).strip().strip("()")
         x, y = s.split("!")
@@ -20,91 +12,209 @@ def parse_coord(s):
     except Exception:
         return np.nan, np.nan
 
-coords = {}
-for col in id_cols:
-    xy = df[col].apply(parse_coord).tolist()
-    coords[col] = pd.DataFrame(xy, columns=["x", "y"], index=df["frame"].values)
+def pop_color(name):
+    if name.startswith("ACO"):
+        return "steelblue"
+    if name.startswith("CA"):
+        return "mediumpurple"
+    if name.startswith("CO"):
+        return "deeppink"
 
-for col in id_cols:
-    coords[col] = coords[col].interpolate(method="linear", limit_direction="both")
+test_names = ['ACO1.mov', 'ACO2.mov', 'ACO3.mov', 'ACO4.mov', 'ACO5.mov',
+              'CACO4.mov', 'CACO5.mov', 
+              'CO1.mov', 'CO2.mov', 'CO3.mov', 'CO4.mov', 'CO5.mov',
+              'CAO4.mov', 'CAO5.mov'
+              ]
 
-STILL_THRESHOLD_PX = 10 # if movement is greater than 10 pixels
-STILL_MIN_FRAMES = 3 # it needs to be still for like 3ish frames?
+aco_totals_cm = {} # dict for per-enclosure totals
+ca_totals_cm = {}
+co_totals_cm = {}
 
-results = {}
-for col in id_cols:
-    xy = coords[col]
-    dx = xy["x"].diff()
-    dy = xy["y"].diff()
-    dist_per_frame = np.sqrt(dx**2 + dy**2).fillna(0)
+avg_speed_per_frame = dict()
+speed_info_per_vid = dict()
 
-    total_dist = dist_per_frame.sum()
+for vid_name in test_names:
+    csv_name = f"./AldenAlg/Tracked_{vid_name}_pwsBacklit.csv"
+    df = pd.read_csv(csv_name)
+    BASE_PATH = "/Volumes/Crucial X9/Downloads/UROP Data Colletion 4-26-2026"
 
-    is_moving = dist_per_frame > STILL_THRESHOLD_PX
-    move_things = 0
-    still_things = 0
-    run_len = 1
-    for i in range(1, len(is_moving)):
-        if is_moving.iloc[i] == is_moving.iloc[i - 1]:
-            run_len += 1
+    df = df.iloc[4:].reset_index(drop=True)
+    cap = cv2.VideoCapture(f"{BASE_PATH}/{vid_name}")
+    if vid_name[0] == 'A':
+        fps = 120
+    else:
+        fps = 60
+    stopaatfiv = fps * 300
+    start_frame = df["frame"].iloc[0]
+    df = df[df["frame"] < start_frame + stopaatfiv].reset_index(drop=True)
+
+    id_cols = [c for c in df.columns if c.startswith("ID_")]
+
+    coords = {}
+    for col in id_cols:
+        xy = df[col].apply(parse_coord).tolist()
+        coords[col] = pd.DataFrame(xy, columns=["x", "y"], index=df["frame"].values)
+
+    for col in id_cols:
+        coords[col] = coords[col].interpolate(method="linear", limit_direction="both")
+
+    results = {}
+    all_frame_dists = []
+
+    for col in id_cols:
+        xy = coords[col]
+        dx = xy["x"].diff()
+        dy = xy["y"].diff()
+        dist_per_frame = np.sqrt(dx**2 + dy**2).fillna(0)
+        all_frame_dists.append(dist_per_frame)
+
+        total_dist_cm = dist_per_frame.sum() * (10 / 1730)
+        results[col] = {"total_distance_px": round(dist_per_frame.sum(), 1), "total_distance_cm": round(total_dist_cm, 2)}
+
+        # adding per-enclosure instead of appending per-fly by 20
+        if vid_name.startswith("ACO"):
+            aco_totals_cm[vid_name] = aco_totals_cm.get(vid_name, 0) + total_dist_cm
+        elif vid_name.startswith("CA"):
+            ca_totals_cm[vid_name] = ca_totals_cm.get(vid_name, 0) + total_dist_cm
+        elif vid_name.startswith("CO"):
+            co_totals_cm[vid_name] = co_totals_cm.get(vid_name, 0) + total_dist_cm
+
+    dist_matrix = pd.concat(all_frame_dists, axis=1).replace(0, np.nan)
+    frame_avg_speed = (dist_matrix.sum(axis=1) / 20) * (10 / 1730) * fps  # cm/s
+
+    for frame_idx, speed in zip(df["frame"].values, frame_avg_speed):
+        avg_speed_per_frame[frame_idx] = speed
+
+    seconds = [(f - df["frame"].iloc[0]) / fps for f in df["frame"].values]
+    speed_info_per_vid[vid_name] = (seconds, list(frame_avg_speed))
+
+    # trajectories
+    colors = plt.cm.tab10.colors
+    for i, col in enumerate(id_cols):
+        xy = coords[col]
+        plt.plot(xy["x"], xy["y"], color=colors[i % 10], lw=1, label=col)
+    plt.gca().invert_yaxis()
+    plt.title(f"{vid_name} Trajectories")
+    plt.xlabel("X (px)")
+    plt.ylabel("Y (px)")
+    plt.savefig(f'./WatershedAlgorithm/UROPPlots/{vid_name}_trajectory.png', dpi=150)
+
+plt.close()
+# raw speed
+vid_names = list(speed_info_per_vid.keys())
+n = len(vid_names)
+ncols = 3
+nrows = (n + ncols - 1) // ncols
+
+# fig1, axes1 = plt.subplots(nrows, ncols, figsize=(ncols * 5, nrows * 3), sharey=True)
+# axes1 = np.array(axes1).flatten()
+# fig1.suptitle("Avg Speed Over Time Per Enclosure (raw)")
+
+# for ax, name in zip(axes1, vid_names):
+#     seconds, speeds = speed_info_per_vid[name]
+#     ax.scatter(seconds, speeds, s=4, alpha=0.25, color=pop_color(name))
+#     window = 10
+#     if len(speeds) > window:
+#         smoothed = np.convolve(speeds, np.ones(window) / window, mode="valid")
+#         ax.plot(seconds[window - 1:], smoothed, color=pop_color(name), lw=1)
+#     ax.set_title(name.replace(".mov", ""))
+#     ax.set_xlabel("Time (s)")
+#     ax.set_ylabel("Speed (cm/s)")
+
+# for ax in axes1[n:]:
+#     ax.set_visible(False)
+
+# fig1.tight_layout()
+# fig1.savefig("./WatershedAlgorithm/UROPPlots/speed_over_time_RAW.png", dpi=150, bbox_inches="tight")
+# plt.show()
+
+
+# binned speeds (easier ngl)
+BIN_SIZE = 5
+
+fig2, axes2 = plt.subplots(nrows, ncols, figsize=(ncols * 5, nrows * 3), sharey=True)
+axes2 = np.array(axes2).flatten()
+fig2.suptitle("Avg Speed Over Time Per Enclosure (5 sec. bins)")
+
+for ax, name in zip(axes2, vid_names):
+    seconds, speeds = speed_info_per_vid[name]
+    s_arr  = np.array(seconds, dtype=float)
+    sp_arr = np.array(speeds,  dtype=float)
+
+    bin_edges   = np.arange(0, s_arr.max() + BIN_SIZE, BIN_SIZE)
+    bin_centers = bin_edges[:-1] + BIN_SIZE / 2
+    bin_means, bin_sems = [], []
+
+    for lo, hi in zip(bin_edges[:-1], bin_edges[1:]):
+        vals = sp_arr[(s_arr >= lo) & (s_arr < hi)]
+        vals = vals[~np.isnan(vals)]
+        if len(vals):
+            bin_means.append(np.mean(vals))
+            bin_sems.append(np.std(vals) / np.sqrt(len(vals)))
         else:
-            if is_moving.iloc[i - 1]:
-                move_things += 1
-            else:
-                if run_len >= STILL_MIN_FRAMES:
-                    still_things += 1
-            run_len = 1
-    if is_moving.iloc[-1]:
-        move_things += 1
-    elif run_len >= STILL_MIN_FRAMES:
-        still_things += 1
+            bin_means.append(np.nan)
+            bin_sems.append(np.nan)
 
-    avg_speed = dist_per_frame[dist_per_frame > 0].mean()
+    bin_means = np.array(bin_means)
+    bin_sems  = np.array(bin_sems)
 
-    results[col] = {"total_distance_px": round(total_dist, 1), "move_things": move_things, "still_things": still_things, "avg_speed_px_per_frame": round(avg_speed, 2)}
+    ax.bar(bin_centers, bin_means, width=BIN_SIZE * 0.85,
+           color=pop_color(name), alpha=0.65)
+    ax.errorbar(bin_centers, bin_means, yerr=bin_sems, fmt="none", color="black", capsize=2, linewidth=0.8)
+    ax.set_title(name.replace(".mov", ""))
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Speed (cm/s)")
 
-metrics_df = pd.DataFrame(results).T
-print("fly metrics df printed")
-print(metrics_df.to_string())
+for ax in axes2[n:]:
+    ax.set_visible(False)
 
-# plots
-fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-colors = plt.cm.tab10.colors
-fly_labels = list(metrics_df.index)
+fig2.tight_layout()
+fig2.savefig("./WatershedAlgorithm/UROPPlots/speed_over_time_BINNED10.png", dpi=150, bbox_inches="tight")
+# plt.show()
+plt.close()
 
-# trajectories
-ax = axes[0, 0]
-for i, col in enumerate(id_cols):
-    xy = coords[col]
-    ax.plot(xy["x"], xy["y"], color=colors[i % 10], lw=1, label=col)
-ax.invert_yaxis()
-ax.set_title("Trajectories"); ax.set_xlabel("X (px)"); ax.set_ylabel("Y (px)")
-# ax.legend(fontsize=7)
 
-# speed over time
-ax = axes[0, 1]
-for i, col in enumerate(id_cols):
-    xy = coords[col]
-    dist = np.sqrt(xy["x"].diff()**2 + xy["y"].diff()**2).fillna(0)
-    ax.plot(df["frame"].values, dist.values, color=colors[i % 10], lw=1, label=col)
-ax.axhline(STILL_THRESHOLD_PX, color="red", linestyle="--", lw=1)
-ax.set_title("Speed Over Time"); ax.set_xlabel("Frame"); ax.set_ylabel("px / frame")
-# ax.legend(fontsize=7)
+# t test stuff
+populations = {"ACO": list(aco_totals_cm.values()), "CA":  list(ca_totals_cm.values()), "CO":  list(co_totals_cm.values())}
 
-# total distance
-ax = axes[1, 0]
-ax.bar(fly_labels, metrics_df["total_distance_px"].values, color=colors[:len(fly_labels)])
-ax.set_title("Total Distance (px)"); ax.set_ylabel("Pixels")
+t_aco_co, p_aco_co = ttest_ind(populations["ACO"], populations["CO"], equal_var=False)
+t_aco_ca, p_aco_ca = ttest_ind(populations["ACO"], populations["CA"], equal_var=False)
+t_ca_co, p_ca_co = ttest_ind(populations["CA"], populations["CO"], equal_var=False)
 
-# move vs still things
-ax = axes[1, 1]
-x = np.arange(len(fly_labels))
-ax.bar(x - 0.2, metrics_df["move_things"].values,  width=0.4, label="Moving", color="steelblue")
-ax.bar(x + 0.2, metrics_df["still_things"].values, width=0.4, label="Still",  color="salmon")
-ax.set_xticks(x); ax.set_xticklabels(fly_labels)
-ax.set_title("Move vs Still Things"); ax.set_ylabel("Count")
-# ax.legend()
+print(f"p_aco_co {p_aco_co}")
+print(f"p_aco_ca {p_aco_ca}")
+print(f"p_ca_co {p_ca_co}")
+
+
+# final overall stuff
+colors = {"ACO": "steelblue", "CA": "mediumpurple", "CO": "deeppink"}
+
+# ax = axes[1]
+pop_names = list(populations.keys())
+data = [populations[p] for p in pop_names]
+bp = plt.boxplot(data, patch_artist=True)
+
+for patch, pop in zip(bp['boxes'], pop_names):
+    patch.set_facecolor(colors[pop])
+    patch.set_alpha(0.7)
+
+for element in ['whiskers', 'caps', 'medians', 'fliers']:
+    for item in bp[element]:
+        item.set_color('black')
+
+plt.xticks(range(1, len(pop_names) + 1), labels=pop_names)
+
+y_max = max(max(v) for v in populations.values())
+for step, (i, j, p) in enumerate([(0, 2, p_aco_co), (0, 1, p_aco_ca), (1, 2, p_ca_co)]):
+    # boxplot x positions are 1-indexed
+    xi, xj = i + 1, j + 1
+    y = y_max * (1.08 + 0.07 * step)
+    plt.plot([xi, xi, xj, xj], [y, y * 1.01, y * 1.01, y], color='black', lw=1)
+    plt.text((xi + xj) / 2, y * 1.015, 'SIG' if p < 0.001 else '', ha='center', va='bottom', fontsize=10)
+
+plt.ylabel("Total Distance (cm)")
+plt.title("Total Distance Distribution")
 
 plt.tight_layout()
-plt.savefig("./WatershedAlgorithm/Plots/Tracked_ACO1.MOV_pwsBacklit.png", dpi=150, bbox_inches="tight")
-plt.show()
+plt.savefig("./WatershedAlgorithm/UROPPlots/pop_move_OVERALL.png", dpi=150)
+# plt.show()

@@ -14,4 +14,7 @@ KalmanFilter
 Outputs
 *.mp4
 backlit_fgmask.py
-watershed_pathing_backlit copy.py
+watershed_pathing_backlit_velocity.py
+graphs.py
+graph.py
+.gitignore
