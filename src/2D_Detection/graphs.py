@@ -106,29 +106,6 @@ n = len(vid_names)
 ncols = 3
 nrows = (n + ncols - 1) // ncols
 
-# fig1, axes1 = plt.subplots(nrows, ncols, figsize=(ncols * 5, nrows * 3), sharey=True)
-# axes1 = np.array(axes1).flatten()
-# fig1.suptitle("Avg Speed Over Time Per Enclosure (raw)")
-
-# for ax, name in zip(axes1, vid_names):
-#     seconds, speeds = speed_info_per_vid[name]
-#     ax.scatter(seconds, speeds, s=4, alpha=0.25, color=pop_color(name))
-#     window = 10
-#     if len(speeds) > window:
-#         smoothed = np.convolve(speeds, np.ones(window) / window, mode="valid")
-#         ax.plot(seconds[window - 1:], smoothed, color=pop_color(name), lw=1)
-#     ax.set_title(name.replace(".mov", ""))
-#     ax.set_xlabel("Time (s)")
-#     ax.set_ylabel("Speed (cm/s)")
-
-# for ax in axes1[n:]:
-#     ax.set_visible(False)
-
-# fig1.tight_layout()
-# fig1.savefig("./WatershedAlgorithm/UROPPlots/speed_over_time_RAW.png", dpi=150, bbox_inches="tight")
-# plt.show()
-
-
 # binned speeds (easier ngl)
 BIN_SIZE = 5
 
