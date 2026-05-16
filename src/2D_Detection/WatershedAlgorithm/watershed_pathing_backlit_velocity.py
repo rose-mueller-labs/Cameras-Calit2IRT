@@ -149,7 +149,7 @@ def get_fg_mask(frame, name):
         cv2.drawContours(arena_mask, [largest], -1, 255, thickness=cv2.FILLED)
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (53, 53))
         arena_mask = cv2.erode(arena_mask, kernel, iterations=1)
-    cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/arena_mask_{name}.png", arena_mask)
+    cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/arena_mask_{name}.png", arena_mask)
 
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     fly_mask = cv2.inRange(rgb, LOWER_BROWN, UPPER_BROWN)
@@ -208,14 +208,14 @@ def get_good_cnts(contours, frame):
 BASE_PATH = "/Volumes/Crucial X9/Downloads/Calit2 Data Collection 05-06-2026"
 
 LOWER_BROWN = np.array([0, 70, 0])
-UPPER_BROWN = np.array([215, 175, 138])
+UPPER_BROWN = np.array([215, 185, 185])
 
 MAX_LOST_FRAMES = 10 # frames to keep a lost object in the recovery buffer
 MIN_LIFETIME = 5 # min frames before an object is considered valid
 MAX_PATH_LENGTH = 50 # max points in path history
 
 MAX_CONTOUR_AREA = 1100
-STOP_SEC = 300
+STOP_SEC = 5
 
 # Velocity / flight parameters added
 VELOCITY_ALPHA = 0.4  # EMA weight for new velocity samples (higher = more reactive)
@@ -223,7 +223,7 @@ FLYING_SPEED_THRESHOLD = 15  # px/frame; above this a fly is labelled as flying
 #  Normal walking match uses DISTANCE_THRESHOLD (tight).
 #  When velocity predicts a large displacement we allow FLIGHT_DISTANCE_THRESHOLD (loose).
 #  FLIGHT_DISTANCE_THRESHOLD should be large enough to cover max realistic flight speed per frame.
-FLIGHT_DISTANCE_THRESHOLD = 250 # px: adjust based on the fps & arena size in videos
+FLIGHT_DISTANCE_THRESHOLD = 75 # px: adjust based on the fps & arena size in videos (100 -> 250 -> good)
 
 CURRENT_TOTAL_FLIES = 0
 
@@ -233,14 +233,14 @@ print(os.listdir(BASE_PATH))
 #               'CO1.MOV', 'CO2.MOV', 'CO3.MOV',
 #               'CO4.MOV', 'CO5.MOV']
 # vid_names = ['ACO2.MOV', 'ACO3.MOV', 'CO2.MOV', 'CO3.MOV']
-for vid_name in os.listdir(BASE_PATH):
+for vid_name in os.listdir(BASE_PATH)[:2]:
     skip_list = {'.', 'procedure.heic', 'CAO4.MOV', }
     if vid_name[0] == '.' or vid_name in skip_list:
         continue
 
     vid_path = f"{BASE_PATH}/{vid_name}"
 
-    DISTANCE_THRESHOLD = 90
+    DISTANCE_THRESHOLD = 200
     LOW_COL = 140
     HIGH_COL = 1600
     LOWER_ROW = 800
@@ -249,18 +249,18 @@ for vid_name in os.listdir(BASE_PATH):
 
     cap = cv2.VideoCapture(vid_path)
     name = vid_path.split('/')[-1]
-    csv_name = (f"./2D_Detection/WatershedAlgorithm/Output/Velocity/UROPVids/"
+    csv_name = (f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/"
                 f"Tracked_{name}_pwsBacklitV.csv")
 
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    output_path = (f'./2D_Detection/WatershedAlgorithm/Output/Velocity/UROPVids/'
+    output_path = (f'./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/'
                    f'{name}_pwsBacklitV.mp4')
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
-    out = cv2.VideoWriter(output_path, fourcc, fps, (HIGH_COL - LOW_COL, HIGH_ROW - LOWER_ROW))
+    out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
     save_flies = False
 
@@ -288,19 +288,16 @@ for vid_name in os.listdir(BASE_PATH):
         continue
 
     ret, frame = cap.read()
-    frame = frame[LOWER_ROW:HIGH_ROW, LOW_COL:HIGH_COL]
+    
+    # frame = frame[LOWER_ROW:HIGH_ROW, LOW_COL:HIGH_COL]
     if frame_count >= fps * STOP_SEC:
         cap.release()
         out.release()
         continue
     if ret or frame_count <= fps * STOP_SEC:
         fg_mask, bg_mask = get_fg_mask(frame, name)
-        cv2.imwrite(
-            f"./2D_Detection/WatershedAlgorithm/Output/Velocity/UROPVids/{name}_bg_mask_pwsBacklitV.png",
-            bg_mask)
-        cv2.imwrite(
-            f"./2D_Detection/WatershedAlgorithm/Output/Velocity/UROPVids/{name}_debug_mask_pwsBacklitV.png",
-            fg_mask)
+        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_bg_mask_pwsBacklitV.png", bg_mask)
+        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_debug_mask_pwsBacklitV.png", fg_mask)
     if not ret:
         cap.release()
         out.release()
@@ -314,8 +311,10 @@ for vid_name in os.listdir(BASE_PATH):
 
     large_contours, disp_frm = get_good_cnts(contours, frame)
 
+    frame_ct = frame.copy()
     for cnt in large_contours:
         bbox = cv2.boundingRect(cnt)
+        x, y, w, h = bbox
         tracked_objects[next_object_id] = bbox
         object_lifetimes[next_object_id] = 1
         cx, cy = get_center(bbox)
@@ -323,7 +322,15 @@ for vid_name in os.listdir(BASE_PATH):
         # Initialise velocity to zero
         object_velocities[next_object_id] = (0.0, 0.0)
         last_centers[next_object_id] = (cx, cy)
-        next_object_id += 1
+        frame_ct = cv2.rectangle(frame_ct, (x, y), (x + w, y + h), (0, 255, 0), 3)
+        # Label flying flies so you can spot mis-matches visually
+        label = f'fli'
+        cv2.putText(frame_ct, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 2)
+        # write it = frame_ct
+    
+    frame_ct_rgb = cv2.cvtColor(frame_ct, cv2.COLOR_BGR2RGB)
+    plt.imshow(frame_ct_rgb)
+    plt.savefig(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_debug_cnt.png")
 
     frame_data = {'frame': 0}
     for obj_id, bbox in tracked_objects.items():
@@ -341,13 +348,11 @@ for vid_name in os.listdir(BASE_PATH):
             break
         if not ret or frame_count >= fps * STOP_SEC:
             break
-        frame2 = frame2[LOWER_ROW:HIGH_ROW, LOW_COL:HIGH_COL]
+        # frame2 = frame2[LOWER_ROW:HIGH_ROW, LOW_COL:HIGH_COL]
         frame_count += 1
 
         fg_mask, bg_mask = get_fg_mask(frame2, name)
-        cv2.imwrite(
-            f"./2D_Detection/WatershedAlgorithm/Output/Velocity/UROPVids/{name}_debug_mask_pwsBacklitV.png",
-            fg_mask)
+        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_debug_mask_pwsBacklitV.png", fg_mask)
 
         watershed_cnts = apply_watershed_segmentation(fg_mask, bg_mask, frame2)
         contours = watershed_cnts
@@ -496,11 +501,11 @@ for vid_name in os.listdir(BASE_PATH):
                 frame2 = cv2.rectangle(frame2, (x, y), (x + w, y + h), color, 3)
                 # Label flying flies so you can spot mis-matches visually
                 label = f'ID:{obj_id} [FLY]' if is_flying(obj_id) else f'ID:{obj_id}'
-                cv2.putText(frame2, label, (x, y - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2)
+                if is_flying(obj_id):
+                    print(f'  [FLY] fly ID {obj_id}')
+                cv2.putText(frame2, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2)
 
-        cv2.putText(frame2, f'TOTAL FLIES: {CURRENT_TOTAL_FLIES}', (100, 100),
-                    cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 2)
+        cv2.putText(frame2, f'TOTAL FLIES: {CURRENT_TOTAL_FLIES}', (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 2)
 
         out.write(frame2)
 

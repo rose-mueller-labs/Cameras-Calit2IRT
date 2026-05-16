@@ -21,8 +21,7 @@ def get_unique_color(obj_id):
     return colors[obj_id]
 
 def get_name(obj_id):
-    names = ['Alden', 'Neela', 'Shreya', 'Zach', 'Corrina', 'Jacob', 'Miao', 'Alex', 'Irene',
-             'Michael', 'Laurence', 'Vivian']
+    names = ['Alden', 'Neela', 'Shreya', 'Ekam', 'Jacob', 'Michael', 'Abbie', 'Miao', "Zach", 'Corrina']
     return names[obj_id % len(names)]
 
 def get_center(bbox):
@@ -120,7 +119,7 @@ def get_good_cnts(contours, frame):
     return large_contours, disp_frm
 
 LOWER_BROWN = np.array([0, 0, 0])
-UPPER_BROWN = np.array([90, 90, 90])
+UPPER_BROWN = np.array([120, 120, 120])
 MAX_LOST_FRAMES = 10
 MIN_LIFETIME = 5
 MAX_PATH_LENGTH = 50
@@ -128,8 +127,10 @@ DISTANCE_THRESHOLD = 200
 RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
 min_contour_area = 20
 MAX_CONTOUR_AREA = 80
-Y_CROP = 121
-X_CROP_END = 1356
+Y_CROP = 56
+Y_CROP_END = 761
+X_CROP_END = 1337
+X_CROP = 798
 
 CURRENT_TOTAL_FLIES = 0
 
@@ -164,11 +165,16 @@ while cap.isOpened():
         break
 
     frame_count += 1
-    
-    # plt.imshow(cv2.cvtColor(frame_full, cv2.COLOR_BGR2RGB))
-    # plt.show()
 
-    frame_crop = frame_full[Y_CROP:, :X_CROP_END].copy()
+    frame_crop = frame_full[Y_CROP:Y_CROP_END, X_CROP:X_CROP_END].copy()
+
+    # plt.subplot(1,2,1)
+    # plt.imshow(cv2.cvtColor(frame_full, cv2.COLOR_BGR2RGB))
+
+    # plt.subplot(1,2,2)
+    # plt.imshow(cv2.cvtColor(frame_crop, cv2.COLOR_BGR2RGB))
+    # plt.show()
+    
 
     fg_mask, bg_mask = get_fg_mask(frame_crop)
     cv2.imwrite(f"./Output/Backlit/UROPVids/{name}_debug_mask_pwsBacklit.png", fg_mask)
@@ -261,14 +267,14 @@ while cap.isOpened():
     for obj_id, bbox in tracked_objects.items():
         if object_lifetimes.get(obj_id, 0) >= MIN_LIFETIME:
             x, y, w, h = bbox
-            x_full = x
+            x_full = x + X_CROP
             y_full = y + Y_CROP
 
-            draw_paths(frame_full, object_paths, obj_id, y_offset=Y_CROP, x_offset=0)
+            draw_paths(frame_full, object_paths, obj_id, y_offset=Y_CROP, x_offset=X_CROP)
             color = get_unique_color(obj_id)
             cv2.rectangle(frame_full, (x_full, y_full), (x_full + w, y_full + h), color, 3)
             cv2.putText(frame_full, f'{get_name(obj_id)}', (x_full, max(30, y_full - 10)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
     cv2.putText(frame_full, f'TOTAL FLIES: {CURRENT_TOTAL_FLIES}', (100, 100),
                 cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 2)
