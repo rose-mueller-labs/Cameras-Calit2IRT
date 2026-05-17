@@ -20,11 +20,7 @@ def pop_color(name):
     if name.startswith("CO"):
         return "deeppink"
 
-test_names = ['ACO1.mov', 'ACO2.mov', 'ACO3.mov', 'ACO4.mov', 'ACO5.mov',
-              'CACO4.mov', 'CACO5.mov', 
-              'CO1.mov', 'CO2.mov', 'CO3.mov', 'CO4.mov', 'CO5.mov',
-              'CAO4.mov', 'CAO5.mov'
-              ]
+test_names = ['CO1d42.mov']
 
 aco_totals_cm = {} # dict for per-enclosure totals
 ca_totals_cm = {}
@@ -34,16 +30,13 @@ avg_speed_per_frame = dict()
 speed_info_per_vid = dict()
 
 for vid_name in test_names:
-    csv_name = f"./AldenAlg/Tracked_{vid_name}_pwsBacklit.csv"
+    csv_name = f"./WatershedAlgorithm/Velocity/CalitVids/Tracked_{vid_name}_pwsBacklitV2.csv"
     df = pd.read_csv(csv_name)
-    BASE_PATH = "/Volumes/Crucial X9/Downloads/UROP Data Colletion 4-26-2026"
+    BASE_PATH = "/Volumes/Crucial X9/Downloads/Calit2 Data Collection 05-06-2026"
 
     df = df.iloc[4:].reset_index(drop=True)
     cap = cv2.VideoCapture(f"{BASE_PATH}/{vid_name}")
-    if vid_name[0] == 'A':
-        fps = 120
-    else:
-        fps = 60
+    fps = 120
     stopaatfiv = fps * 300
     start_frame = df["frame"].iloc[0]
     df = df[df["frame"] < start_frame + stopaatfiv].reset_index(drop=True)
@@ -97,101 +90,102 @@ for vid_name in test_names:
     plt.title(f"{vid_name} Trajectories")
     plt.xlabel("X (px)")
     plt.ylabel("Y (px)")
-    plt.savefig(f'./WatershedAlgorithm/UROPPlots/{vid_name}_trajectory.png', dpi=150)
+    plt.savefig(f'./WatershedAlgorithm/CalitPlots/{vid_name}_trajectory.png', dpi=150)
 
 plt.close()
-# raw speed
-vid_names = list(speed_info_per_vid.keys())
-n = len(vid_names)
-ncols = 3
-nrows = (n + ncols - 1) // ncols
 
-# binned speeds (easier ngl)
-BIN_SIZE = 5
+# # raw speed
+# vid_names = list(speed_info_per_vid.keys())
+# n = len(vid_names)
+# ncols = 3
+# nrows = (n + ncols - 1) // ncols
 
-fig2, axes2 = plt.subplots(nrows, ncols, figsize=(ncols * 5, nrows * 3), sharey=True)
-axes2 = np.array(axes2).flatten()
-fig2.suptitle("Avg Speed Over Time Per Enclosure (5 sec. bins)")
+# # binned speeds (easier ngl)
+# BIN_SIZE = 5
 
-for ax, name in zip(axes2, vid_names):
-    seconds, speeds = speed_info_per_vid[name]
-    s_arr  = np.array(seconds, dtype=float)
-    sp_arr = np.array(speeds,  dtype=float)
+# fig2, axes2 = plt.subplots(nrows, ncols, figsize=(ncols * 5, nrows * 3), sharey=True)
+# axes2 = np.array(axes2).flatten()
+# fig2.suptitle("Avg Speed Over Time Per Enclosure (5 sec. bins)")
 
-    bin_edges   = np.arange(0, s_arr.max() + BIN_SIZE, BIN_SIZE)
-    bin_centers = bin_edges[:-1] + BIN_SIZE / 2
-    bin_means, bin_sems = [], []
+# for ax, name in zip(axes2, vid_names):
+#     seconds, speeds = speed_info_per_vid[name]
+#     s_arr  = np.array(seconds, dtype=float)
+#     sp_arr = np.array(speeds,  dtype=float)
 
-    for lo, hi in zip(bin_edges[:-1], bin_edges[1:]):
-        vals = sp_arr[(s_arr >= lo) & (s_arr < hi)]
-        vals = vals[~np.isnan(vals)]
-        if len(vals):
-            bin_means.append(np.mean(vals))
-            bin_sems.append(np.std(vals) / np.sqrt(len(vals)))
-        else:
-            bin_means.append(np.nan)
-            bin_sems.append(np.nan)
+#     bin_edges   = np.arange(0, s_arr.max() + BIN_SIZE, BIN_SIZE)
+#     bin_centers = bin_edges[:-1] + BIN_SIZE / 2
+#     bin_means, bin_sems = [], []
 
-    bin_means = np.array(bin_means)
-    bin_sems  = np.array(bin_sems)
+#     for lo, hi in zip(bin_edges[:-1], bin_edges[1:]):
+#         vals = sp_arr[(s_arr >= lo) & (s_arr < hi)]
+#         vals = vals[~np.isnan(vals)]
+#         if len(vals):
+#             bin_means.append(np.mean(vals))
+#             bin_sems.append(np.std(vals) / np.sqrt(len(vals)))
+#         else:
+#             bin_means.append(np.nan)
+#             bin_sems.append(np.nan)
 
-    ax.bar(bin_centers, bin_means, width=BIN_SIZE * 0.85,
-           color=pop_color(name), alpha=0.65)
-    ax.errorbar(bin_centers, bin_means, yerr=bin_sems, fmt="none", color="black", capsize=2, linewidth=0.8)
-    ax.set_title(name.replace(".mov", ""))
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Speed (cm/s)")
+#     bin_means = np.array(bin_means)
+#     bin_sems  = np.array(bin_sems)
 
-for ax in axes2[n:]:
-    ax.set_visible(False)
+#     ax.bar(bin_centers, bin_means, width=BIN_SIZE * 0.85,
+#            color=pop_color(name), alpha=0.65)
+#     ax.errorbar(bin_centers, bin_means, yerr=bin_sems, fmt="none", color="black", capsize=2, linewidth=0.8)
+#     ax.set_title(name.replace(".mov", ""))
+#     ax.set_xlabel("Time (s)")
+#     ax.set_ylabel("Speed (cm/s)")
 
-fig2.tight_layout()
-fig2.savefig("./WatershedAlgorithm/UROPPlots/speed_over_time_BINNED10.png", dpi=150, bbox_inches="tight")
-# plt.show()
-plt.close()
+# for ax in axes2[n:]:
+#     ax.set_visible(False)
 
-
-# t test stuff
-populations = {"ACO": list(aco_totals_cm.values()), "CA":  list(ca_totals_cm.values()), "CO":  list(co_totals_cm.values())}
-
-t_aco_co, p_aco_co = ttest_ind(populations["ACO"], populations["CO"], equal_var=False)
-t_aco_ca, p_aco_ca = ttest_ind(populations["ACO"], populations["CA"], equal_var=False)
-t_ca_co, p_ca_co = ttest_ind(populations["CA"], populations["CO"], equal_var=False)
-
-print(f"p_aco_co {p_aco_co}")
-print(f"p_aco_ca {p_aco_ca}")
-print(f"p_ca_co {p_ca_co}")
+# fig2.tight_layout()
+# fig2.savefig("./WatershedAlgorithm/CalitPlots/speed_over_time_BINNED10.png", dpi=150, bbox_inches="tight")
+# # plt.show()
+# plt.close()
 
 
-# final overall stuff
-colors = {"ACO": "steelblue", "CA": "mediumpurple", "CO": "deeppink"}
+# # t test stuff
+# populations = {"ACO": list(aco_totals_cm.values()), "CA":  list(ca_totals_cm.values()), "CO":  list(co_totals_cm.values())}
 
-# ax = axes[1]
-pop_names = list(populations.keys())
-data = [populations[p] for p in pop_names]
-bp = plt.boxplot(data, patch_artist=True)
+# t_aco_co, p_aco_co = ttest_ind(populations["ACO"], populations["CO"], equal_var=False)
+# t_aco_ca, p_aco_ca = ttest_ind(populations["ACO"], populations["CA"], equal_var=False)
+# t_ca_co, p_ca_co = ttest_ind(populations["CA"], populations["CO"], equal_var=False)
 
-for patch, pop in zip(bp['boxes'], pop_names):
-    patch.set_facecolor(colors[pop])
-    patch.set_alpha(0.7)
+# print(f"p_aco_co {p_aco_co}")
+# print(f"p_aco_ca {p_aco_ca}")
+# print(f"p_ca_co {p_ca_co}")
 
-for element in ['whiskers', 'caps', 'medians', 'fliers']:
-    for item in bp[element]:
-        item.set_color('black')
 
-plt.xticks(range(1, len(pop_names) + 1), labels=pop_names)
+# # final overall stuff
+# colors = {"ACO": "steelblue", "CA": "mediumpurple", "CO": "deeppink"}
 
-y_max = max(max(v) for v in populations.values())
-for step, (i, j, p) in enumerate([(0, 2, p_aco_co), (0, 1, p_aco_ca), (1, 2, p_ca_co)]):
-    # boxplot x positions are 1-indexed
-    xi, xj = i + 1, j + 1
-    y = y_max * (1.08 + 0.07 * step)
-    plt.plot([xi, xi, xj, xj], [y, y * 1.01, y * 1.01, y], color='black', lw=1)
-    plt.text((xi + xj) / 2, y * 1.015, 'SIG' if p < 0.001 else '', ha='center', va='bottom', fontsize=10)
+# # ax = axes[1]
+# pop_names = list(populations.keys())
+# data = [populations[p] for p in pop_names]
+# bp = plt.boxplot(data, patch_artist=True)
 
-plt.ylabel("Total Distance (cm)")
-plt.title("Total Distance Distribution")
+# for patch, pop in zip(bp['boxes'], pop_names):
+#     patch.set_facecolor(colors[pop])
+#     patch.set_alpha(0.7)
 
-plt.tight_layout()
-plt.savefig("./WatershedAlgorithm/UROPPlots/pop_move_OVERALL.png", dpi=150)
-# plt.show()
+# for element in ['whiskers', 'caps', 'medians', 'fliers']:
+#     for item in bp[element]:
+#         item.set_color('black')
+
+# plt.xticks(range(1, len(pop_names) + 1), labels=pop_names)
+
+# y_max = max(max(v) for v in populations.values())
+# for step, (i, j, p) in enumerate([(0, 2, p_aco_co), (0, 1, p_aco_ca), (1, 2, p_ca_co)]):
+#     # boxplot x positions are 1-indexed
+#     xi, xj = i + 1, j + 1
+#     y = y_max * (1.08 + 0.07 * step)
+#     plt.plot([xi, xi, xj, xj], [y, y * 1.01, y * 1.01, y], color='black', lw=1)
+#     plt.text((xi + xj) / 2, y * 1.015, 'SIG' if p < 0.001 else '', ha='center', va='bottom', fontsize=10)
+
+# plt.ylabel("Total Distance (cm)")
+# plt.title("Total Distance Distribution")
+
+# plt.tight_layout()
+# plt.savefig("./WatershedAlgorithm/CalitPlots/pop_move_OVERALL.png", dpi=150)
+# # plt.show()
