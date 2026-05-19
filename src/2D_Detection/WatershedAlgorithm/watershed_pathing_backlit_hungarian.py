@@ -210,12 +210,13 @@ MIN_LIFETIME = 5 # min frames before an object is considered valid
 MAX_PATH_LENGTH = 50 # max points in path history
 
 MAX_CONTOUR_AREA = 1100
-STOP_SEC = 300
+STOP_SEC = 10
 
 # Velocity / flight parameters
-VELOCITY_ALPHA = 0.4 # EMA weight for new velocity samples (higher = more reactive)
+VELOCITY_ALPHA = 0.8 # EMA weight for new velocity samples (higher = more reactive)
 FLYING_SPEED_THRESHOLD = 15 # px/frame; above this a fly is labelled as flying
 FLIGHT_DISTANCE_THRESHOLD = 100 # px: relaxed threshold for predicted-position matching
+DISTANCE_THRESHOLD = 50 # walking threshold
 
 CURRENT_TOTAL_FLIES = 0
 
@@ -229,11 +230,10 @@ for vid_name in os.listdir(BASE_PATH):
 
     vid_path = f"{BASE_PATH}/{vid_name}"
 
-    DISTANCE_THRESHOLD = 10
     min_contour_area = 350
 
     # Make them the same to avoid spawning new ids
-    RECOVERY_THRESHOLD = FLIGHT_DISTANCE_THRESHOLD
+    RECOVERY_THRESHOLD = DISTANCE_THRESHOLD
 
     cap = cv2.VideoCapture(vid_path)
     name = vid_path.split('/')[-1]
@@ -242,6 +242,7 @@ for vid_name in os.listdir(BASE_PATH):
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
+    # print(f"FPS: {fps}") 119 FPS
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     output_path = (f'./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_pwsBacklitV2_{'debug' if DEBUG else ''}.mp4')
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -453,6 +454,7 @@ for vid_name in os.listdir(BASE_PATH):
                 object_paths[next_object_id] = deque([(cx, cy)], maxlen=MAX_PATH_LENGTH)
                 object_velocities[next_object_id] = (0.0, 0.0)
                 last_centers[next_object_id] = (cx, cy)
+                print(f"  [NEW FLY] fly ID {next_object_id} at ({cx}, {cy})")
                 next_object_id += 1
 
         # Step 3: Clean up lost buffer
