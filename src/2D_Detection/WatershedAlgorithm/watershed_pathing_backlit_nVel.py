@@ -1,6 +1,6 @@
 '''
 w/ Hungarian Matching, velocity prediction, and new flight handling
-
+--------------------------------------------------
 new changes from backlit_hungarian.py:
   1. Ghost tracking in lost buffer: predicted position advances each frame via EMA velocity,
      so a flying fly's expected landing zone keeps moving with it rather than sitting static.
@@ -9,7 +9,7 @@ new changes from backlit_hungarian.py:
   6. ID-swap guard: during Hungarian assignment, a candidate match is rejected when the predicted center lands *closer* to a *different* tracked fly than to the assigned one (prevents neighbor-steal on landing).
   7. MAX_LOST_FRAMES raised 20 to 35 to survive longer flights at 119 fps.
   8. New-fly gate: a detection is only spawned as a new ID when no lost fly's ghost position is within RECOVERY_THRESHOLD, preventing post-landing re-spawns.
-
+--------------------------------------------------
 https://www.geeksforgeeks.org/dsa/hungarian-algorithm-assignment-problem-set-1-introduction/
 https://cp-algorithms.com/graph/hungarian-algorithm.html
 --------------------------------------------------
@@ -18,7 +18,7 @@ things to fix:
 - it's not detecting A's AT ALL rn, so i gotta do that
 - same thing with SCO's, make a diff vid for that, because it's detecting 2x the amt that it is for CO's
 - when the flies are edging it can't detect them/differentiate them like at all so need to fix that
-
+--------------------------------------------------
 ideas:
 - diff LOWER_ UPPER_ BROWN ranges for SC and AC vids
 - diff arena/bg_mask detection bounds for SC and AC vids

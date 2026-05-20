@@ -4,16 +4,16 @@ https://www.geeksforgeeks.org/dsa/hungarian-algorithm-assignment-problem-set-1-i
 https://cp-algorithms.com/graph/hungarian-algorithm.html
 https://en.wikipedia.org/wiki/Hungarian_algorithm
 https://www.columbia.edu/~cs2035/courses/ieor8100.F12/lec6.pdf
-
+--------------------------------------------------
 good things:
 1) hungarian works great!
 2) flies works like 30% of the time
 3) 
-
+--------------------------------------------------
 worked but we have issues:
 1) when a fly flies it keeps getting detected as a new fly or swaps IDs or picks up an old ID
 2) swapping IDs is still happening in general
-
+--------------------------------------------------
 ideas:
 1) add in like the static lost objects picking up to be able to detect ghosts based ont he same vel pred stuff we alr have
 2) make flying = arena size

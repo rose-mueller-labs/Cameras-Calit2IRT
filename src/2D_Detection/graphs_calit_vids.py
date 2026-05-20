@@ -20,7 +20,9 @@ def pop_color(name):
     if name.startswith("AC"):
         return "mediumpurple"
 
-test_names = ['CO1d42.mov', 'CO2D14.mov', 'SCO1Ad28.mov', 'SCO2Ad28.mov', 'CO3d14.mov', 'ACO2.mov']
+test_names = ['CO1d42.mov', 'CO2D14.mov', 'CO3d14.mov', 'CO4d14.mov', 'CO4d42.mov', 'CO5d42.mov', 
+              'SCO1Ad28.mov', 'SCO2Ad28.mov', 
+              'ACO2.mov', 'ACO1.mov']
 
 sco_totals_cm = {}
 co_totals_cm = {}
