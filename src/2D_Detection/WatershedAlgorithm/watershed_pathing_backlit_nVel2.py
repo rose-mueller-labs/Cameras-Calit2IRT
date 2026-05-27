@@ -48,7 +48,7 @@ MIN_LIFETIME = 5
 MAX_PATH_LENGTH = 50
 
 MIN_CONTOUR_AREA = 350
-MAX_CONTOUR_AREA = 2600
+MAX_CONTOUR_AREA = 1200
 
 CIRC_MIN = 0.15
 CIRC_MAX = 0.80
@@ -63,6 +63,10 @@ RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
 FLYING_SPEED_THRESHOLD = 15
 
 STOP_SEC = 300
+
+FLY_FGMASK_THRESH = 185 # 185 for CO and SCO, 195 for A's
+
+FIRST_VID = True
 
 
 # vel helpers
@@ -176,7 +180,12 @@ def get_fg_mask(frame, name):
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (53, 53))
         arena_mask = cv2.erode(arena_mask, kernel, iterations=1)
 
-    _, fly_mask = cv2.threshold(gray, 185, 255, cv2.THRESH_BINARY_INV)
+    _, fly_mask = cv2.threshold(gray, FLY_FGMASK_THRESH, 255, cv2.THRESH_BINARY_INV)
+    # plt.imshow(frame)
+    # plt.show()
+    # plt.close()
+    # plt.imshow(fly_mask, cmap='gray')
+    # plt.show()
     fly_mask = cv2.bitwise_and(fly_mask, arena_mask)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -265,6 +274,13 @@ print(os.listdir(BASE_PATH))
 
 for vid_name in os.listdir(BASE_PATH):
     skip_list = {'.', 'procedure.heic', 'CO1d42.mov', 'SCO2Ad28.mov'}
+    if not vid_name.startswith('A') and FIRST_VID:
+        continue
+
+    if vid_name.startswith('A'):
+        FLY_FGMASK_THRESH = 195
+        FIRST_VID = False
+
     output_prefix = vid_name[:2]
     if vid_name[0] == '.' or vid_name in skip_list:
         continue
@@ -305,7 +321,7 @@ for vid_name in os.listdir(BASE_PATH):
     if not cap.isOpened():
         print(f"Error opening {vid_path}")
         continue
-
+    print(f'Analyzing {vid_name} for {STOP_SEC} seconds.')
     # init frame to see where flies r at
     ret, frame = cap.read()
     if not ret:
