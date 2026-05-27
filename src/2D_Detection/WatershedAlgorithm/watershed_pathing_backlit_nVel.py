@@ -17,7 +17,8 @@ things to fix:
 - we need a completely different thing for A types b/c they are colored diffrently and the vid is kinda diff looking
 - it's not detecting A's AT ALL rn, so i gotta do that
 - same thing with SCO's, make a diff vid for that, because it's detecting 2x the amt that it is for CO's
-- when the flies are edging it can't detect them/differentiate them like at all so need to fix that
+- when the flies are going near the edge of the box it can't detect them/differentiate them. 
+- when two flies brush by each other, they merge into one big fly - MAX_CONTOUR_AREA change?
 --------------------------------------------------
 ideas:
 - diff LOWER_ UPPER_ BROWN ranges for SC and AC vids
@@ -60,7 +61,7 @@ RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2 # same as walking for on-ground reco
 
 FLYING_SPEED_THRESHOLD = 15 # px/frame speed they gotta go to be flying
 
-STOP_SEC = 10 # seconds of video to process per clip
+STOP_SEC = 60 # seconds of video to process per clip
 
 # vel helpers
 
@@ -263,7 +264,10 @@ BASE_PATH = "/Volumes/Crucial X9/Downloads/Calit2 Data Collection 05-06-2026"
 print(os.listdir(BASE_PATH))
 
 for vid_name in os.listdir(BASE_PATH):
-    skip_list = {'.', 'procedure.heic', 'CAO4.MOV'}
+    skip_list = {'.', 'procedure.heic', 'CO1d42.mov'}
+    if not vid_name.startswith('CO'):
+        continue
+
     if vid_name[0] == '.' or vid_name in skip_list:
         continue
 
@@ -338,8 +342,8 @@ for vid_name in os.listdir(BASE_PATH):
         frame_count += 1
 
         fg_mask, bg_mask = get_fg_mask(frame2, name)
-        # cv2.imwrite(./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_fg_mask_written_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.png, fg_mask)
-        # cv2.imwrite(./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_bg_mask_written_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.png, bg_mask)
+        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_fg_mask_written_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.png", fg_mask)
+        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_bg_mask_written_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.png", bg_mask)
         watershed_cnts = apply_watershed_segmentation(fg_mask, bg_mask, frame2)
         large_contours, disp_frm = get_good_cnts(watershed_cnts, frame2, bg_mask)
         # cv2.imwrite(./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_disp_frm_written_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.png, disp_frm)
@@ -531,9 +535,8 @@ for vid_name in os.listdir(BASE_PATH):
 
         out.write(frame2)
 
-        if frame_count % 30 == 0:
-            print(f"{name} @ frame {frame_count}: valid={valid_flies},tracked={len(tracked_objects)},lost={len(lost_objects)}"
-            )
+        if frame_count % fps == 0:
+            print(f"{name} @ frame {frame_count}| {frame_count//fps} sec: valid={valid_flies},tracked={len(tracked_objects)},lost={len(lost_objects)}")
 
     # write to the CSV
     if tracking_data:
