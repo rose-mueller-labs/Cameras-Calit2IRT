@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import cv2
-from scipy.stats import ttest_ind, linregress
+from scipy.stats import ttest_ind, linregress, t
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
 def parse_coord(s):
@@ -94,7 +94,7 @@ for vid_name in test_names:
     plt.title(f"{vid_name.split('.mov')[0]} Trajectories")
     plt.xlabel("X (px)")
     plt.ylabel("Y (px)")
-    plt.savefig(f'./WatershedAlgorithm/UROPPlots2/{vid_name}_trajectory.png', dpi=150)
+    plt.savefig(f'./WatershedAlgorithm/CalitPlotswUROPVids/{vid_name}_trajectory.png', dpi=150)
     plt.close()
 plt.close()
 # raw speed
@@ -112,10 +112,10 @@ fig2.suptitle("Avg Speed Over Time Per Enclosure (5 sec. bins)")
 
 for ax, name in zip(axes2, vid_names):
     seconds, speeds = speed_info_per_vid[name]
-    s_arr  = np.array(seconds, dtype=float)
+    s_arr = np.array(seconds, dtype=float)
     sp_arr = np.array(speeds,  dtype=float)
 
-    bin_edges   = np.arange(0, s_arr.max() + BIN_SIZE, BIN_SIZE)
+    bin_edges = np.arange(0, s_arr.max() + BIN_SIZE, BIN_SIZE)
     bin_centers = bin_edges[:-1] + BIN_SIZE / 2
     bin_means, bin_sems = [], []
 
@@ -130,7 +130,7 @@ for ax, name in zip(axes2, vid_names):
             bin_sems.append(np.nan)
 
     bin_means = np.array(bin_means)
-    bin_sems  = np.array(bin_sems)
+    bin_sems = np.array(bin_sems)
 
     ax.bar(bin_centers, bin_means, width=BIN_SIZE * 0.85, color=pop_color(name), alpha=0.65)
     ax.errorbar(bin_centers, bin_means, yerr=bin_sems, fmt="none", color="black", capsize=2, linewidth=0.8)
@@ -142,7 +142,7 @@ for ax in axes2[n:]:
     ax.set_visible(False)
 
 fig2.tight_layout()
-fig2.savefig("./WatershedAlgorithm/UROPPlots2/speed_over_time_BINNED10.png", dpi=150, bbox_inches="tight")
+fig2.savefig("./WatershedAlgorithm/CalitPlotswUROPVids/speed_over_time_BINNED10.png", dpi=150, bbox_inches="tight")
 # plt.show()
 plt.close()
 
@@ -186,20 +186,26 @@ ax_box.set_title("Total Distance Distribution")
 ax_box.text(0.03, 0.5, f"p = {p_aco_co:.3g}", transform=ax_box.transAxes, ha='left', va='top') # yo fix this
 
 fig_box.tight_layout()
-fig_box.savefig("./WatershedAlgorithm/UROPPlots2/pop_move_OVERALL.png", dpi=150)
+fig_box.savefig("./WatershedAlgorithm/CalitPlotswUROPVids/pop_move_OVERALL.png", dpi=150)
 plt.close()
 
 # binned speed avg with smoothed n lin fit
 bin_edges = np.arange(0, 300 + BIN_SIZE, BIN_SIZE)
 bin_centers = bin_edges[:-1] + BIN_SIZE / 2
 
-
-pop_groups = {"ACO": [], "CO": []}
-for vid_name, (seconds, speeds) in speed_info_per_vid.items():
-    key = "ACO" if vid_name.startswith("ACO") else "CO"
-    s_arr = np.array(seconds, dtype=float)
-    sp_arr = np.array(speeds, dtype=float)
-
+def reg_ci(x, y, xgrid, alpha=0.05):
+    x = np.asarray(x, float)
+    y = np.asarray(y, float)
+    n = len(x)
+    slope, intercept, r, p, se = linregress(x, y)
+    yhat = slope * x + intercept
+    s_err = np.sqrt(np.sum((y - yhat) ** 2) / (n - 2))
+    xbar = x.mean()
+    sxx = np.sum((x - xbar) ** 2)
+    ygrid = slope * xgrid + intercept
+    tcrit = t.ppf(1 - alpha / 2, df=n - 2)
+    ci = tcrit * s_err * np.sqrt(1 / n + (xgrid - xbar) ** 2 / sxx)
+    return ygrid, ygrid - ci, ygrid + ci, p
 
 pop_groups = {"ACO": [], "CO": []}
 
@@ -217,7 +223,7 @@ for vid_name, (seconds, speeds) in speed_info_per_vid.items():
     pop_groups[key].append(vid_bin_means)
 
 
-fig4, ax4 = plt.subplots(1, 1, figsize=(8, 12))
+fig4, ax4 = plt.subplots(1, 1, figsize=(8, 8))
 fig4.suptitle("Average Activity Over Time", fontsize=20) # keep default size
 
 
@@ -231,22 +237,48 @@ for pop, style in pop_styles.items():
     sems = np.nanstd(mat, axis=0) / np.sqrt((~np.isnan(mat)).sum(axis=0))
     c = style["color"]
 
-
     ax.scatter(bin_centers, means, color=c, alpha=0.5, label=f"{style['label']}")
-    ax.errorbar(bin_centers, means, yerr=sems, fmt="none", color=c, capsize=2, linewidth=0.8, alpha=0.5)
-
+    # ax.errorbar(bin_centers, means, yerr=sems, fmt="none", color=c, capsize=2, linewidth=0.8, alpha=0.5)
 
     valid = ~np.isnan(means)
     x_v, y_v = bin_centers[valid], means[valid]
 
+    # smoothed = lowess(y_v, x_v, frac=0.3, return_sorted=True)
+    # ax.plot(smoothed[:, 0], smoothed[:, 1], color=c, lw=2, label=f"{style['label']} smoothed")
 
-    smoothed = lowess(y_v, x_v, frac=0.3, return_sorted=True)
-    ax.plot(smoothed[:, 0], smoothed[:, 1], color=c, lw=2, label=f"{style['label']} smoothed")
+    # first 100s fit
+    first = x_v <= 100
+    if first.sum() >= 3:
+        x1 = x_v[first]
+        y1 = y_v[first]
+        xgrid1 = np.linspace(x1.min(), x1.max(), 200)
+        yfit1, lo1, hi1, p1 = reg_ci(x1, y1, xgrid1)
+        ax4.plot(xgrid1, yfit1, color=c, lw=2.2, label=f"{style['label']} 0-100 sec (p={p1:.3g})", alpha=0.4)
+        ax4.fill_between(xgrid1, lo1, hi1, color="gray", alpha=0.22)
 
+    # middle 100s fit
+    # middle = x_v.all(x_v, where=(100 <= x_v <= 200))
+    # if middle.sum() >= 3:
+    x3 = x_v[np.where(np.logical_and(x_v>=100, x_v<=200))]
+    y3 = y_v[np.where(np.logical_and(x_v>=100, x_v<=200))]
+    xgrid3 = np.linspace(x3.min(), x3.max(), 200)
+    yfit3, lo3, hi3, p3 = reg_ci(x3, y3, xgrid3)
+    ax4.plot(xgrid3, yfit3, color=c, lw=2.2, label=f"{style['label']} 100-200 sec (p={p3:.3g})", alpha=0.4)
+    ax4.fill_between(xgrid3, lo3, hi3, color="gray", alpha=0.22)
+
+
+    # last 100s fit
+    last = x_v >= 200
+    if last.sum() >= 3:
+        x2 = x_v[last]
+        y2 = y_v[last]
+        xgrid2 = np.linspace(x2.min(), x2.max(), 200)
+        yfit2, lo2, hi2, p2 = reg_ci(x2, y2, xgrid2)
+        ax4.plot(xgrid2, yfit2, color=c, lw=2.2, label=f"{style['label']} 200-300 sec (p={p2:.3g})", alpha=0.4)
+        ax4.fill_between(xgrid2, lo2, hi2, color="gray", alpha=0.22)
 
     slope, intercept, r, p_val, *_ = linregress(x_v, y_v)
     print(pop, p_val)
-
 
     y_fit = slope * x_v + intercept
     ax.plot(x_v, y_fit, color=c, lw=1, label=f"{style['label']} fit (r={round(r, 2)}, p={round(p_val, 4)})")
@@ -260,7 +292,7 @@ ax.tick_params(axis='both', labelsize=14)
 
 
 fig4.tight_layout()
-fig4.savefig("./WatershedAlgorithm/UROPPlots2/pop_speed_averaged_fit.png", dpi=150)
+fig4.savefig("./WatershedAlgorithm/CalitPlotswUROPVids/pop_speed_averaged_fit.png", dpi=150)
 plt.close()
 
 #-------------
@@ -269,13 +301,13 @@ plt.close()
 # have the confidence interval around the above linear lines.
 
 # # binned speed avg with smoothed n lin fit
-# bin_edges   = np.arange(0, 300 + BIN_SIZE, BIN_SIZE)
+# bin_edges= np.arange(0, 300 + BIN_SIZE, BIN_SIZE)
 # bin_centers = bin_edges[:-1] + BIN_SIZE / 2
 
 # pop_groups = {"ACO": [], "CO": []}
 # for vid_name, (seconds, speeds) in speed_info_per_vid.items():
 #     key = "ACO" if vid_name.startswith("ACO") else "CO"
-#     s_arr  = np.array(seconds, dtype=float)
+#     s_arr = np.array(seconds, dtype=float)
 #     sp_arr = np.array(speeds,  dtype=float)
 
 #     vid_bin_means = []
@@ -284,25 +316,6 @@ plt.close()
 #         vals = vals[~np.isnan(vals)]
 #         vid_bin_means.append(np.nanmean(vals) if len(vals) else np.nan)
 #     pop_groups[key].append(vid_bin_means)
-
-# from scipy.stats import linregress, t
-# from statsmodels.nonparametric.smoothers_lowess import lowess
-# import numpy as np
-# import matplotlib.pyplot as plt
-
-# def reg_ci(x, y, xgrid, alpha=0.05):
-#     x = np.asarray(x, float)
-#     y = np.asarray(y, float)
-#     n = len(x)
-#     slope, intercept, r, p, se = linregress(x, y)
-#     yhat = slope * x + intercept
-#     s_err = np.sqrt(np.sum((y - yhat) ** 2) / (n - 2))
-#     xbar = x.mean()
-#     sxx = np.sum((x - xbar) ** 2)
-#     ygrid = slope * xgrid + intercept
-#     tcrit = t.ppf(1 - alpha / 2, df=n - 2)
-#     ci = tcrit * s_err * np.sqrt(1 / n + (xgrid - xbar) ** 2 / sxx)
-#     return ygrid, ygrid - ci, ygrid + ci, p
 
 # fig4, ax4 = plt.subplots(figsize=(8, 12))
 # fig4.suptitle("Average Activity Over Time", fontsize=24)
@@ -331,36 +344,11 @@ plt.close()
 
 #     # ax4.errorbar(x_v, y_v, yerr=sems[valid], fmt="o", color=c, capsize=2, alpha=0.8, label=style["label"])
 
-#     # gray lowess smoother
-#     smoothed = lowess(y_v, x_v, frac=0.3, return_sorted=True)
-#     ax4.plot(smoothed[:, 0], smoothed[:, 1], color=c, lw=2.5, alpha=0.9)
-
-#     # first 100s fit
-#     first = x_v <= 100
-#     if first.sum() >= 3:
-#         x1 = x_v[first]
-#         y1 = y_v[first]
-#         xgrid1 = np.linspace(x1.min(), x1.max(), 200)
-#         yfit1, lo1, hi1, p1 = reg_ci(x1, y1, xgrid1)
-#         ax4.plot(xgrid1, yfit1, color=c, lw=2.2, label=f"{style['label']} first 100s (p={p1:.3g})", alpha=0.4)
-#         ax4.fill_between(xgrid1, lo1, hi1, color="gray", alpha=0.22)
-
-
-#     # last 100s fit
-#     last = x_v >= 200
-#     if last.sum() >= 3:
-#         x2 = x_v[last]
-#         y2 = y_v[last]
-#         xgrid2 = np.linspace(x2.min(), x2.max(), 200)
-#         yfit2, lo2, hi2, p2 = reg_ci(x2, y2, xgrid2)
-#         ax4.plot(xgrid2, yfit2, color=c, lw=2.2, label=f"{style['label']} last 100s (p={p2:.3g})", alpha=0.4)
-#         ax4.fill_between(xgrid2, lo2, hi2, color="gray", alpha=0.22)
-
 # ax4.set_xlabel("Time (s)", fontsize=24)
 # ax4.set_ylabel("Avg Speed (cm/s)", fontsize=24)
 # # ax4.set_title("Average Activity Over Time", fontsize=24)
 # ax4.tick_params(axis="both", labelsize=14)
 # ax4.legend(fontsize=14)
 # fig4.tight_layout()
-# fig4.savefig("./WatershedAlgorithm/UROPPlots2/pop_speed_averaged_fit_updated.png", dpi=150, bbox_inches="tight")
+# fig4.savefig("./WatershedAlgorithm/CalitPlotswUROPVids/pop_speed_averaged_fit_updated.png", dpi=150, bbox_inches="tight")
 # plt.close(fig4)
