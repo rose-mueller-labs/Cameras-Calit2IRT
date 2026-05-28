@@ -54,11 +54,3 @@ while frames:
 
 release resources
 ```
-
-## Winter 2026 Plan
-
-1. [ ] Create program to count flies per frame and figure out when they die.
-
-2. [ ] Get 3D tracking set up.
-
-3. [ ] Patch the ID continuity issue in the 2D code.
