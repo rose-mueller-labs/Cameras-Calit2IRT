@@ -273,13 +273,10 @@ BASE_PATH = "/Volumes/Crucial X9/Downloads/Calit2 Data Collection 05-06-2026"
 print(os.listdir(BASE_PATH))
 
 for vid_name in os.listdir(BASE_PATH):
-    skip_list = {'.', 'procedure.heic', 'CO1d42.mov', 'SCO2Ad28.mov', 'ACO2.mov', 'ACO4.mov'}
-    if not vid_name.startswith('A'):
+    skip_list = {'.', 'procedure.heic', 'CO1d42.mov', 'SCO2Ad28.mov'}
+    if not vid_name.startswith('C'):
         continue
-
-    if vid_name.startswith('A'):
-        FLY_FGMASK_THRESH = 195
-
+    
     output_prefix = vid_name[:2]
     if vid_name[0] == '.' or vid_name in skip_list:
         continue
@@ -300,7 +297,7 @@ for vid_name in os.listdir(BASE_PATH):
 
     output_path = (f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids{output_prefix}/{name}_pwsBacklitV3_{'debug' if DEBUG else ''}.mp4")
 
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v') # RPZA for apple QT files
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
     # tracking data structures

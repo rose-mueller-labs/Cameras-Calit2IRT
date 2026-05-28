@@ -1,3 +1,9 @@
+'''
+b/w days:
+- box and whisker plots of all the groups w/ total movement
+- statistical significance test b/w each of them (t-test)
+- trajectory plot like the mortality curves based on days
+'''
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -11,8 +17,8 @@ def parse_coord(s):
         return np.nan, np.nan
 
 # params
-vid_name = "ACO2.mov" 
-csv_path = f"./WatershedAlgorithm/Output/Velocity/CalitVidsAC/Tracked_{vid_name}_pwsBacklitV3_debug.csv"
+vid_name = "CO5d42.mov" 
+csv_path = f"./WatershedAlgorithm/Output/Velocity/CalitVidsCO/Tracked_{vid_name}_pwsBacklitV3_debug.csv"
 video_dir = "/Volumes/Crucial X9/Downloads/Calit2 Data Collection 05-06-2026"
 fps = 120
 MAX_SEC = 300
@@ -40,10 +46,10 @@ colors = plt.cm.tab20.colors
 
 for i, col in enumerate(id_cols):
     xy = coords[col]
-    ax1.plot(xy["x"], xy["y"], color = colors[i % 20], lw = 0.8, label = col)
+    ax1.plot(xy["x"], xy["y"], color = colors[i%20], lw = 0.8, label = col)
 
 ax1.invert_yaxis()
-ax1.set_title(f"{vid_name.replace('.mov', '')} — Trajectories")
+ax1.set_title(f"{vid_name.replace('.mov', '')} - Trajectories")
 ax1.set_xlabel("X (px)")
 ax1.set_ylabel("Y (px)")
 ax1.legend(id_cols, fontsize = 3, loc = "upper right")
@@ -61,7 +67,7 @@ for col in id_cols:
     all_frame_dists.append(dist)
 
 dist_matrix  = pd.concat(all_frame_dists, axis = 1).replace(0, np.nan)
-frame_avg_speed = (dist_matrix.sum(axis = 1) / N_FLIES) * PX_TO_CM * fps   # cm/s
+frame_avg_speed = (dist_matrix.sum(axis = 1) / N_FLIES)*PX_TO_CM*fps   # cm/s
 
 seconds = [(f-start_frame)/fps for f in df["frame"].values]
 
