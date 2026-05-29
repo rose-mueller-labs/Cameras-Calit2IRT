@@ -230,7 +230,7 @@ fig4, ax4 = plt.subplots(1, 1, figsize=(8, 8))
 fig4.suptitle("Average Activity Over Time", fontsize=20) # keep default size
 
 
-pop_styles = {"ACO": {"color": "deeppink", "label": "ACO"}, "CO": {"color": "steelblue", "label": "CO"}}
+pop_styles = {"CO": {"color": "steelblue", "label": "CO"}, "ACO": {"color": "deeppink", "label": "ACO"}, }
 
 
 for pop, style in pop_styles.items():
