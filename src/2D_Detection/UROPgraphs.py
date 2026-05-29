@@ -86,16 +86,16 @@ for vid_name in test_names:
     speed_info_per_vid[vid_name] = (seconds, list(frame_avg_speed))
 
     # trajectories
-    colors = plt.cm.tab10.colors
-    for i, col in enumerate(id_cols):
-        xy = coords[col]
-        plt.plot(xy["x"], xy["y"], color=colors[i % 10], lw=1, label=col)
-    plt.gca().invert_yaxis()
-    plt.title(f"{vid_name.split('.mov')[0]} Trajectories")
-    plt.xlabel("X (px)")
-    plt.ylabel("Y (px)")
-    plt.savefig(f'./WatershedAlgorithm/CalitPlotswUROPVids/{vid_name}_trajectory.png', dpi=150)
-    plt.close()
+    # colors = plt.cm.tab10.colors
+    # for i, col in enumerate(id_cols):
+    #     xy = coords[col]
+    #     plt.plot(xy["x"], xy["y"], color=colors[i % 10], lw=1, label=col)
+    # plt.gca().invert_yaxis()
+    # plt.title(f"{vid_name.split('.mov')[0]} Trajectories")
+    # plt.xlabel("X (px)")
+    # plt.ylabel("Y (px)")
+    # plt.savefig(f'./WatershedAlgorithm/CalitPlotswUROPVids/{vid_name}_trajectory.png', dpi=150)
+    # plt.close()
 plt.close()
 # raw speed
 vid_names = list(speed_info_per_vid.keys())
@@ -205,7 +205,10 @@ def reg_ci(x, y, xgrid, alpha=0.05):
     ygrid = slope * xgrid + intercept
     tcrit = t.ppf(1 - alpha / 2, df=n - 2)
     ci = tcrit * s_err * np.sqrt(1 / n + (xgrid - xbar) ** 2 / sxx)
-    return ygrid, ygrid - ci, ygrid + ci, p
+    slope = f"{slope:.3g}"
+    intercept = f"{intercept:.3g}"
+    p = f"{p:.3g}"
+    return ygrid, ygrid - ci, ygrid + ci, p, slope, intercept
 
 pop_groups = {"ACO": [], "CO": []}
 
@@ -237,7 +240,7 @@ for pop, style in pop_styles.items():
     sems = np.nanstd(mat, axis=0) / np.sqrt((~np.isnan(mat)).sum(axis=0))
     c = style["color"]
 
-    ax.scatter(bin_centers, means, color=c, alpha=0.5, label=f"{style['label']}")
+    ax.scatter(bin_centers, means, color=c, alpha=0.5)
     # ax.errorbar(bin_centers, means, yerr=sems, fmt="none", color=c, capsize=2, linewidth=0.8, alpha=0.5)
 
     valid = ~np.isnan(means)
@@ -252,8 +255,12 @@ for pop, style in pop_styles.items():
         x1 = x_v[first]
         y1 = y_v[first]
         xgrid1 = np.linspace(x1.min(), x1.max(), 200)
-        yfit1, lo1, hi1, p1 = reg_ci(x1, y1, xgrid1)
-        ax4.plot(xgrid1, yfit1, color=c, lw=2.2, label=f"{style['label']} 0-100 sec (p={p1:.3g})", alpha=0.4)
+        yfit1, lo1, hi1, p1, slope, intercept = reg_ci(x1, y1, xgrid1)
+        ax4.plot(xgrid1, yfit1, color=c, lw=2.2, label=f"{style['label'][0]}", alpha=0.4)
+        if pop=='ACO':
+            ax4.text(15, 0.5, f"{slope}x+{intercept}\np={p1}", color=c)
+        else:
+            ax4.text(32.3, 2, f"{slope}x+{intercept}\np={p1}", color=c)
         ax4.fill_between(xgrid1, lo1, hi1, color="gray", alpha=0.22)
 
     # middle 100s fit
@@ -262,8 +269,12 @@ for pop, style in pop_styles.items():
     x3 = x_v[np.where(np.logical_and(x_v>=100, x_v<=200))]
     y3 = y_v[np.where(np.logical_and(x_v>=100, x_v<=200))]
     xgrid3 = np.linspace(x3.min(), x3.max(), 200)
-    yfit3, lo3, hi3, p3 = reg_ci(x3, y3, xgrid3)
-    ax4.plot(xgrid3, yfit3, color=c, lw=2.2, label=f"{style['label']} 100-200 sec (p={p3:.3g})", alpha=0.4)
+    yfit3, lo3, hi3, p3, slope, intercept = reg_ci(x3, y3, xgrid3)
+    if pop=='ACO':
+        ax4.text(121, 0.43, f"{slope}x+{intercept}\np={p3}", color=c)
+    else:
+        ax4.text(126, 1.72, f"{slope}x+{intercept}\np={p3}", color=c)
+    ax4.plot(xgrid3, yfit3, color=c, lw=2.2, alpha=0.4)
     ax4.fill_between(xgrid3, lo3, hi3, color="gray", alpha=0.22)
 
 
@@ -273,15 +284,19 @@ for pop, style in pop_styles.items():
         x2 = x_v[last]
         y2 = y_v[last]
         xgrid2 = np.linspace(x2.min(), x2.max(), 200)
-        yfit2, lo2, hi2, p2 = reg_ci(x2, y2, xgrid2)
-        ax4.plot(xgrid2, yfit2, color=c, lw=2.2, label=f"{style['label']} 200-300 sec (p={p2:.3g})", alpha=0.4)
+        yfit2, lo2, hi2, p2, slope, intercept = reg_ci(x2, y2, xgrid2)
+        if pop=='ACO':
+            ax4.text(208, 0.5, f"{slope}x+{intercept}\np={p2}", color=c)
+        else:
+            ax4.text(212, 1.67, f"{slope}x+{intercept}\np={p2}", color=c)
+        ax4.plot(xgrid2, yfit2, color=c, lw=2.2, alpha=0.4)
         ax4.fill_between(xgrid2, lo2, hi2, color="gray", alpha=0.22)
 
     slope, intercept, r, p_val, *_ = linregress(x_v, y_v)
     print(pop, p_val)
 
     y_fit = slope * x_v + intercept
-    ax.plot(x_v, y_fit, color=c, lw=1, label=f"{style['label']} fit (r={round(r, 2)}, p={round(p_val, 4)})")
+    # ax.plot(x_v, y_fit, color=c, lw=1, label=f"{style['label']} fit (r={round(r, 2)}, p={round(p_val, 4)})")
 
 
 ax.legend(fontsize=10)
