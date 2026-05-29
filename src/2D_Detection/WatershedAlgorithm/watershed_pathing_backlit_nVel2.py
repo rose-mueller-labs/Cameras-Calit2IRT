@@ -276,7 +276,10 @@ BASE_PATH = "/Volumes/Crucial X9/Downloads/Calit2 Data Collection 05-06-2026"
 print(os.listdir(BASE_PATH))
 
 for vid_name in os.listdir(BASE_PATH):
-    skip_list = {'.', 'procedure.heic', 'CO1d42.mov', 'SCO2Ad28.mov', 'ACO2.mov', 'ACO4.mov'}
+    skip_list = {'.', 'procedure.heic', # CO1d14.mov 
+                 'CO1d42.mov', 'CO2d14.mov', 'CO2d42.mov', 'CO3d14.mov', 'CO3d42.mov', 'CO4d14.mov', 'CO4d42.mov', 'CO4d14.mov', 'CO4d42.mov',
+                 'SCO2Ad28.mov', 
+                 'ACO1.mov', 'ACO2.mov', 'ACO4.mov'} # ACO3.mov, ACO5.mov
     if not vid_name.startswith('A'):
         continue
 
