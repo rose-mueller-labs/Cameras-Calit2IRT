@@ -98,7 +98,7 @@ for vid_name in test_names:
     plt.title(f"{vid_name.split('.mov')[0]} Trajectories")
     plt.xlabel("X (px)")
     plt.ylabel("Y (px)")
-    plt.savefig(f'./WatershedAlgorithm/CalitPlotswUROPVids/{vid_name}_trajectory.png', dpi=150)
+    plt.savefig(f'./WatershedAlgorithm/CalitPlots/nVel2/{vid_name}_trajectory.png', dpi=150)
     plt.close()
 plt.close()
 # raw speed

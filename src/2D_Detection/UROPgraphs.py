@@ -86,16 +86,16 @@ for vid_name in test_names:
     speed_info_per_vid[vid_name] = (seconds, list(frame_avg_speed))
 
     # trajectories
-    # colors = plt.cm.tab10.colors
-    # for i, col in enumerate(id_cols):
-    #     xy = coords[col]
-    #     plt.plot(xy["x"], xy["y"], color=colors[i % 10], lw=1, label=col)
-    # plt.gca().invert_yaxis()
-    # plt.title(f"{vid_name.split('.mov')[0]} Trajectories")
-    # plt.xlabel("X (px)")
-    # plt.ylabel("Y (px)")
-    # plt.savefig(f'./WatershedAlgorithm/CalitPlotswUROPVids/{vid_name}_trajectory.png', dpi=150)
-    # plt.close()
+    colors = plt.cm.tab10.colors
+    for i, col in enumerate(id_cols):
+        xy = coords[col]
+        plt.plot(xy["x"], xy["y"], color=colors[i % 10], lw=1, label=col)
+    plt.gca().invert_yaxis()
+    plt.title(f"{vid_name.split('.mov')[0]} Trajectories")
+    plt.xlabel("X (px)")
+    plt.ylabel("Y (px)")
+    plt.savefig(f'./WatershedAlgorithm/CalitPlotswUROPVids/{vid_name}_trajectory.png', dpi=150)
+    plt.close()
 plt.close()
 # raw speed
 vid_names = list(speed_info_per_vid.keys())
