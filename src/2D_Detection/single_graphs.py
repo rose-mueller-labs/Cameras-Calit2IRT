@@ -17,7 +17,7 @@ def parse_coord(s):
         return np.nan, np.nan
 
 # params
-vid_name = "CO5d42.mov" 
+vid_name = "CO5d14.mov" 
 csv_path = f"./WatershedAlgorithm/Output/Velocity/CalitVidsCO/Tracked_{vid_name}_pwsBacklitV3_debug.csv"
 video_dir = "/Volumes/Crucial X9/Downloads/Calit2 Data Collection 05-06-2026"
 fps = 120

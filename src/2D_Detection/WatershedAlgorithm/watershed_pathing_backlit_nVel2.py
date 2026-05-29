@@ -26,6 +26,9 @@ Unchanged from nVel:
   - MAX_LOST_FRAMES = 35
   - New-fly gate via RECOVERY_THRESHOLD (now only used when under cap)
 --------------------------------------------------
+PROBLEMS;
+- not working/detection well on edges for A-types due to perforated edges of the flies in fg-mask
+- it is okay if i ignore the first 10 or so seconds of the video for some reason
 '''
 
 import cv2
