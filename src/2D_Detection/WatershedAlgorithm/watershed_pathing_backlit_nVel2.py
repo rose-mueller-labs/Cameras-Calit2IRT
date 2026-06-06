@@ -43,17 +43,17 @@ import os
 DEBUG = True
 
 # Params
-KNOWN_FLY_COUNT = 20 # FIX 1/2/3: hard truth that we always 20 flies
+KNOWN_FLY_COUNT = 15 # FIX 1/2/3: hard truth that we always 20 flies
 FORCE_RECOVERY_MAX_DIST = 700 # FIX 2: max px for forced assignment when at cap
 
 MAX_LOST_FRAMES = 35
 MIN_LIFETIME = 5
 MAX_PATH_LENGTH = 50
 
-MIN_CONTOUR_AREA = 350
-MAX_CONTOUR_AREA = 1200
+MIN_CONTOUR_AREA = 200
+MAX_CONTOUR_AREA = 800
 
-CIRC_MIN = 0.15
+CIRC_MIN = 0.40
 CIRC_MAX = 0.80
 
 VELOCITY_ALPHA = 0.8
@@ -65,10 +65,16 @@ RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
 
 FLYING_SPEED_THRESHOLD = 15
 
-STOP_SEC = 300
+STOP_SEC = 10
 
-FLY_FGMASK_THRESH = 185 # 185 for CO and SCO, 195 for A's
+# For C types
+FLY_FGMASK_THRESH = 185 
 
+# For A types
+LOWER_BROWN = np.array([70, 70, 70])
+UPPER_BROWN = np.array([200, 195, 195])
+
+A_TYPE = False
 FIRST_VID = True
 
 
@@ -184,11 +190,16 @@ def get_fg_mask(frame, name):
         arena_mask = cv2.erode(arena_mask, kernel, iterations=1)
 
     _, fly_mask = cv2.threshold(gray, FLY_FGMASK_THRESH, 255, cv2.THRESH_BINARY_INV)
-    # plt.imshow(frame)
+    if A_TYPE:
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        fly_mask = cv2.inRange(rgb, LOWER_BROWN, UPPER_BROWN)
+    
+    # plt.imshow(rgb)
     # plt.show()
     # plt.close()
     # plt.imshow(fly_mask, cmap='gray')
     # plt.show()
+
     fly_mask = cv2.bitwise_and(fly_mask, arena_mask)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -249,7 +260,7 @@ def get_good_cnts(contours, frame, arena_mask):
             continue
 
         cv2.rectangle(disp_frm, (x, y), (x + w, y + h), (0, 200, 0), 2)
-        cv2.putText(disp_frm, f'{round(circularity, 2)}', (x + 4, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+        cv2.putText(disp_frm, f'{round(cnt_ar, 2)}', (x + 4, y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
         large_contours.append(cnt)
 
     return large_contours, disp_frm
@@ -271,7 +282,7 @@ def register_tracked(obj_id, bbox):
 
 # MAIN LOOP
 
-BASE_PATH = "/Volumes/Crucial X9/Downloads/Calit2 Data Collection 05-06-2026"
+BASE_PATH = "/Volumes/Crucial X9/Downloads/PupalHeight" # Calit2 Data Collection 05-06-2026"
 
 print(os.listdir(BASE_PATH))
 
@@ -279,12 +290,13 @@ for vid_name in os.listdir(BASE_PATH):
     skip_list = {'.', 'procedure.heic', # CO1d14.mov 
                  'CO1d42.mov', 'CO2d14.mov', 'CO2d42.mov', 'CO3d14.mov', 'CO3d42.mov', 'CO4d14.mov', 'CO4d42.mov', 'CO4d14.mov', 'CO4d42.mov',
                  'SCO2Ad28.mov', 
-                 'ACO1.mov', 'ACO2.mov', 'ACO4.mov'} # ACO3.mov, ACO5.mov
-    if not vid_name.startswith('A'):
+                 'ACO1.mov', 'ACO2.mov', 'ACO4.mov', 'ACO3.mov', 'ACO4.mov'} # ACO3.mov, ACO5.mov
+    if vid_name.startswith('C'):
         continue
 
-    if vid_name.startswith('A'):
-        FLY_FGMASK_THRESH = 195
+    if not vid_name.startswith('C') or not vid_name.startswith('SC'):
+        print('  [INFO] USING IN-RANGE FOREGROUND MASK')
+        A_TYPE = True
 
     output_prefix = vid_name[:2]
     if vid_name[0] == '.' or vid_name in skip_list:
@@ -294,17 +306,19 @@ for vid_name in os.listdir(BASE_PATH):
     cap = cv2.VideoCapture(vid_path)
     name = vid_path.split('/')[-1]
 
-    if not os.path.isdir(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids{output_prefix}"):
-        os.mkdir(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids{output_prefix}")
+    RESULTS_PATH = "PupalHeight" # f"CalitVids{output_prefix}"
 
-    csv_name = (f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids{output_prefix}/Tracked_{name}_pwsBacklitV3_{'debug' if DEBUG else ''}.csv")
+    if not os.path.isdir(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_PATH}"):
+        os.mkdir(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_PATH}")
+
+    csv_name = (f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_PATH}/Tracked_{name}_pwsBacklitV3_{'debug' if DEBUG else ''}.csv")
 
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    output_path = (f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids{output_prefix}/{name}_pwsBacklitV3_{'debug' if DEBUG else ''}.mp4")
+    output_path = (f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_PATH}/{name}_pwsBacklitV3_{'debug' if DEBUG else ''}.mp4")
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v') # RPZA for apple QT files
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
@@ -363,11 +377,14 @@ for vid_name in os.listdir(BASE_PATH):
         frame_count += 1
 
         fg_mask, bg_mask = get_fg_mask(frame2, name)
-        # cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVidsCO/{name}_fg_mask_written_pwsBacklitV3_{'debug' if DEBUG else ''}.png", fg_mask)
-        # cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVidsCO/{name}_bg_mask_written_pwsBacklitV3_{'debug' if DEBUG else ''}.png", bg_mask)
+        # cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_PATH}/{name}_fg_mask_written_pwsBacklitV3_{'debug' if DEBUG else ''}.png", fg_mask)
+        # cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_PATH}/{name}_bg_mask_written_pwsBacklitV3_{'debug' if DEBUG else ''}.png", bg_mask)
 
         watershed_cnts = apply_watershed_segmentation(fg_mask, bg_mask, frame2)
         large_contours, disp_frm = get_good_cnts(watershed_cnts, frame2, bg_mask)
+        if frame_count % 6 == 0:
+            pass
+            # cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_PATH}/{name}_disp_frm.png", disp_frm)
         current_bboxes = [cv2.boundingRect(cnt) for cnt in large_contours]
 
         new_tracked_objects = {}

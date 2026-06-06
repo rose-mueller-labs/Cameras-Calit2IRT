@@ -160,7 +160,7 @@ def get_good_cnts(contours, frame):
     return large_contours, disp_frm
 
 # BASE_PATH="/Volumes/Crucial X9/Cameras-Calit2IRT/src/SampleVideos/Backlit"
-BASE_PATH="/Volumes/Crucial X9/Downloads/UROP Data Colletion 4-26-2026"
+BASE_PATH="/Volumes/Crucial X9/Downloads/PupalHeight"
 
 LOWER_BROWN = np.array([0,  70,   0])
 UPPER_BROWN = np.array([215, 175, 138]) # works for all flies except the one in the rightside
@@ -191,6 +191,7 @@ for vid_name in os.listdir(BASE_PATH):
         continue
     # vid_name = 'CO2.MOV'
     vid_path = f"{BASE_PATH}/{vid_name}"
+    RESULT_LOC = "PupalHeight"
     
     DISTANCE_THRESHOLD = 90 # CAO5
     LOWER_BOUND_CROP = 2747
@@ -200,14 +201,14 @@ for vid_name in os.listdir(BASE_PATH):
     min_contour_area = 200
     cap = cv2.VideoCapture(vid_path)
     name = vid_path.split('/')[-1]
-    csv_name = f"./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/Tracked_{name}_pwsBacklit.csv"
+    csv_name = f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{RESULT_LOC}/Tracked_{name}_pwsBacklit.csv"
 
     # Get video properties
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    output_path = f'./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/{name}_pwsBacklit.mp4'
+    output_path = f'./2D_Detection/WatershedAlgorithm/Output/Backlit/{RESULT_LOC}/{name}_pwsBacklit.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2
     out = cv2.VideoWriter(output_path, fourcc, fps, (WIDTH_BOUND-WIDTH_L_BOUND, LOWER_BOUND_CROP-UPPER_BOUND_CROP))
@@ -250,16 +251,15 @@ for vid_name in os.listdir(BASE_PATH):
         # rgbframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # plt.imshow(rgbframe)
         # plt.show()
-        frame = frame[UPPER_BOUND_CROP:LOWER_BOUND_CROP, WIDTH_L_BOUND:WIDTH_BOUND]
+        #frame[UPPER_BOUND_CROP:LOWER_BOUND_CROP, WIDTH_L_BOUND:WIDTH_BOUND]
         # rgbframe = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # plt.imshow(rgbframe)
         # plt.show()
-        if ret or frame_count <= fps * STOP_SEC:
-            fg_mask, bg_mask = get_fg_mask(frame)
-            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/{name}_bg_mask_pwsBacklit.png", bg_mask)
-            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/{name}_debug_mask_pwsBacklit.png", fg_mask)
         if not ret or frame_count >= fps * STOP_SEC:
             break
+        fg_mask, bg_mask = get_fg_mask(frame)
+        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{RESULT_LOC}/{name}_bg_mask_pwsBacklit.png", bg_mask)
+        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{RESULT_LOC}/{name}_debug_mask_pwsBacklit.png", fg_mask)
             
         watershed_cnts = apply_watershed_segmentation(fg_mask, bg_mask, frame)
         
@@ -283,7 +283,7 @@ for vid_name in os.listdir(BASE_PATH):
             next_object_id += 1
             x, y, w, h = bbox
             frame_written = cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 200), 3)
-            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/{name}_cnt_mask_pwsBacklit.png", frame_written)
+            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{RESULT_LOC}/{name}_cnt_mask_pwsBacklit.png", frame_written)
 
         frame_data = {'frame': 0}
         for obj_id, bbox in tracked_objects.items():
@@ -307,7 +307,7 @@ for vid_name in os.listdir(BASE_PATH):
             frame_count += 1
 
             fg_mask, bg_mask = get_fg_mask(frame2)
-            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/UROPVids/{name}_debug_mask_pwsBacklit.png", fg_mask)
+            cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Backlit/{RESULT_LOC}/{name}_debug_mask_pwsBacklit.png", fg_mask)
 
             watershed_cnts = apply_watershed_segmentation(fg_mask, bg_mask, frame2)
             
