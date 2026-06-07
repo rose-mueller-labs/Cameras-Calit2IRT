@@ -19,7 +19,7 @@ from collections import deque
 BASE_PATH = "/Volumes/Crucial X9/Downloads/PupalHeight"
 
 save_flies = False
-debug_mask = True
+debug_mask = False
 
 # static detector
 CLAHE_CLIP_LIMIT = 2.0
@@ -36,6 +36,7 @@ COLOR_TOLERANCE_H = 15
 COLOR_TOLERANCE_S = 60
 COLOR_TOLERANCE_V = 60
 COLOR_HISTORY_FRAMES = 30
+STOP_SEC =300
 
 # inner ROI - static detector only fires here, MOG2 still runs full frame
 STATIC_BORDER_MARGIN = 40
@@ -316,7 +317,7 @@ for vid_name in os.listdir(BASE_PATH):
 
     while cap.isOpened():
         ret, frame2 = cap.read()
-        if not ret or frame_count >= fps * 5:
+        if not ret or frame_count >= fps * STOP_SEC:
             break
 
         frame_count += 1
