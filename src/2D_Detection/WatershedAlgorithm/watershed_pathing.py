@@ -36,25 +36,31 @@ COLOR_TOLERANCE_H = 15
 COLOR_TOLERANCE_S = 60
 COLOR_TOLERANCE_V = 60
 COLOR_HISTORY_FRAMES = 30
-STOP_SEC =300
+STOP_SEC = 60
 
 # inner ROI - static detector only fires here, MOG2 still runs full frame
 STATIC_BORDER_MARGIN = 40
 
-for vid_name in os.listdir(BASE_PATH):
+skip_list = ['fb1.mov', 'fb2.mov', 'fb3.mov', 'fb4.mov', 
+             'fm1.mov']
+
+for vid_name in os.listdir(BASE_PATH): # @ fm2
     vid_path = f"{BASE_PATH}/{vid_name}"
     if vid_name.startswith('.'):
         continue
 
+    if vid_name in skip_list:
+        continue
+
     cap = cv2.VideoCapture(vid_path)
     name = vid_name
-    csv_name = f"./2D_Detection/WatershedAlgorithm/Output/Pathing/Tracked_{name}_pws.csv"
+    csv_name = f"./2D_Detection/WatershedAlgorithm/Output/Pathing/PupalHeightFinal/Tracked_{name}_pws.csv"
 
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    output_path = f'./2D_Detection/WatershedAlgorithm/Output/Pathing/{name}_path_written_watershed.mp4'
+    output_path = f'./2D_Detection/WatershedAlgorithm/Output/Pathing/PupalHeightFinal/{name}_path_written_watershed.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 
@@ -248,8 +254,7 @@ for vid_name in os.listdir(BASE_PATH):
             if crop.size == 0:
                 continue
             cv2.imwrite(
-                f"./2D_Detection/WatershedAlgorithm/Output/Pathing/"
-                f"fly_crop_{name}_frame{frame_count}_ID{obj_id}.png", crop
+                f"./2D_Detection/WatershedAlgorithm/Output/Pathing/PupalHeightFinal/fly_crop_{name}_frame{frame_count}_ID{obj_id}.png", crop
             )
 
     def get_combined_bboxes(mog2_mask, gray_frame, bgr_frame):
