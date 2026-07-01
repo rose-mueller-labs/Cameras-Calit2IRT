@@ -56,12 +56,15 @@ DISTANCE_THRESHOLD = 60 # walking match radius (px)
 FLIGHT_DISTANCE_THRESHOLD = 350 # was 100 but now it covers full flight arc across lost frames based on dims
 
 # the value that basicaly controls how many new flies we get detected and how ok we are w swapped ids
-# went from 53 to 45 flies by doubling this value in CalitVids/SCO2Ad28.mov
+# went from 53 to 45 flies by doubling this value in {RESULTS_LOC}/SCO2Ad28.mov
 RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2 # same as walking for on-ground recovery
 
 FLYING_SPEED_THRESHOLD = 15 # px/frame speed they gotta go to be flying
 
-STOP_SEC = 60 # seconds of video to process per clip
+STOP_SEC = 300 # seconds of video to process per clip
+
+LOWER_BROWN = np.array([70, 70, 70]) # loosen constraints by a LOT
+UPPER_BROWN = np.array([200, 200, 200]) # dont need inner ROI anymore
 
 # vel helpers
 
@@ -178,7 +181,7 @@ def draw_paths(frame, paths, obj_id):
 def get_fg_mask(frame, name):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    _, white_region = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)
+    _, white_region = cv2.threshold(gray, 175, 255, cv2.THRESH_BINARY)
     contours, _ = cv2.findContours(white_region, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     arena_mask = np.zeros_like(gray)
     if contours:
@@ -187,7 +190,9 @@ def get_fg_mask(frame, name):
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (53, 53))
         arena_mask = cv2.erode(arena_mask, kernel, iterations=1)
 
-    _, fly_mask = cv2.threshold(gray, 185, 255, cv2.THRESH_BINARY_INV)
+    # _, fly_mask = cv2.threshold(gray, 185, 255, cv2.THRESH_BINARY_INV)
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    fly_mask = cv2.inRange(rgb, LOWER_BROWN, UPPER_BROWN)
     fly_mask = cv2.bitwise_and(fly_mask, arena_mask)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -259,7 +264,8 @@ def get_good_cnts(contours, frame, arena_mask):
 
 # MAIN LOOP
 
-BASE_PATH = "/Volumes/Crucial X9/Downloads/Calit2 Data Collection 05-06-2026"
+BASE_PATH = "/Volumes/Crucial X9/Downloads/Blue"
+RESULTS_LOC = "BlueComp"
 
 print(os.listdir(BASE_PATH))
 
@@ -275,14 +281,14 @@ for vid_name in os.listdir(BASE_PATH):
     cap = cv2.VideoCapture(vid_path)
     name = vid_path.split('/')[-1]
 
-    csv_name = f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/Tracked_{name}_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.csv"
+    csv_name = f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_LOC}/Tracked_{name}_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.csv"
 
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    output_path = f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.mp4"
+    output_path = f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_LOC}/{name}_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.mp4"
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
@@ -342,11 +348,11 @@ for vid_name in os.listdir(BASE_PATH):
         frame_count += 1
 
         fg_mask, bg_mask = get_fg_mask(frame2, name)
-        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_fg_mask_written_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.png", fg_mask)
-        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_bg_mask_written_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.png", bg_mask)
+        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_LOC}/{name}_fg_mask_written_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.png", fg_mask)
+        cv2.imwrite(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_LOC}/{name}_bg_mask_written_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.png", bg_mask)
         watershed_cnts = apply_watershed_segmentation(fg_mask, bg_mask, frame2)
         large_contours, disp_frm = get_good_cnts(watershed_cnts, frame2, bg_mask)
-        # cv2.imwrite(./2D_Detection/WatershedAlgorithm/Output/Velocity/CalitVids/{name}_disp_frm_written_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.png, disp_frm)
+        # cv2.imwrite(./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_LOC}/{name}_disp_frm_written_pwsBacklitV2_fixed_{'debug' if DEBUG else ''}.png, disp_frm)
         current_bboxes = [cv2.boundingRect(cnt) for cnt in large_contours]
 
         new_tracked_objects = {}

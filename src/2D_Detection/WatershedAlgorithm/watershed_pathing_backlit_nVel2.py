@@ -43,7 +43,7 @@ import os
 DEBUG = True
 
 # Params
-KNOWN_FLY_COUNT = 15 # FIX 1/2/3: hard truth that we always 20 flies
+KNOWN_FLY_COUNT = 20 # FIX 1/2/3: hard truth that we always 20 flies
 FORCE_RECOVERY_MAX_DIST = 700 # FIX 2: max px for forced assignment when at cap
 
 MAX_LOST_FRAMES = 35
@@ -282,7 +282,8 @@ def register_tracked(obj_id, bbox):
 
 # MAIN LOOP
 
-BASE_PATH = "/Volumes/Crucial X9/Downloads/PupalHeight" # Calit2 Data Collection 05-06-2026"
+BASE_PATH = "/Volumes/Crucial X9/Downloads/Blue" # Calit2 Data Collection 05-06-2026"
+RESULTS_PATH = "Blue" # f"CalitVids{output_prefix}"
 
 print(os.listdir(BASE_PATH))
 
@@ -291,10 +292,10 @@ for vid_name in os.listdir(BASE_PATH):
                  'CO1d42.mov', 'CO2d14.mov', 'CO2d42.mov', 'CO3d14.mov', 'CO3d42.mov', 'CO4d14.mov', 'CO4d42.mov', 'CO4d14.mov', 'CO4d42.mov',
                  'SCO2Ad28.mov', 
                  'ACO1.mov', 'ACO2.mov', 'ACO4.mov', 'ACO3.mov', 'ACO4.mov'} # ACO3.mov, ACO5.mov
-    if vid_name.startswith('C'):
-        continue
+    # if vid_name.startswith('C'):
+    #     continue
 
-    if not vid_name.startswith('C') or not vid_name.startswith('SC'):
+    if RESULTS_PATH == 'Blue': # not vid_name.startswith('C') or not vid_name.startswith('SC'):
         print('  [INFO] USING IN-RANGE FOREGROUND MASK')
         A_TYPE = True
 
@@ -305,8 +306,6 @@ for vid_name in os.listdir(BASE_PATH):
     vid_path = f"{BASE_PATH}/{vid_name}"
     cap = cv2.VideoCapture(vid_path)
     name = vid_path.split('/')[-1]
-
-    RESULTS_PATH = "PupalHeight" # f"CalitVids{output_prefix}"
 
     if not os.path.isdir(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_PATH}"):
         os.mkdir(f"./2D_Detection/WatershedAlgorithm/Output/Velocity/{RESULTS_PATH}")
