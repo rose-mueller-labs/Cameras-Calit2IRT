@@ -274,8 +274,8 @@ print(os.listdir(BASE_PATH))
 
 for vid_name in os.listdir(BASE_PATH):
     skip_list = {'.', 'procedure.heic', 'CO1d42.mov'}
-    if not vid_name.startswith('CO'):
-        continue
+    # if not vid_name.startswith('CO'):
+    #     continue
 
     if vid_name[0] == '.' or vid_name in skip_list:
         continue
