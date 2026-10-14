@@ -11,8 +11,11 @@ from collections import deque
 BASE_PATH="/Volumes/Crucial X9/Cameras-Calit2IRT/BlueVideo_Detection/TestingSet"
 DEBUG_LOC = "/Volumes/Crucial X9/Cameras-Calit2IRT/BlueVideo_Detection/TestingDebug"
 
-for vid_path in os.listdir(BASE_PATH):
-    name = vid_path.split('/')[-1]
+STOP_SEC = 60
+
+for name in os.listdir(BASE_PATH):
+    vid_path = f"{BASE_PATH}/{name}"
+    # name = vid_path.split('/')[-1]
     cap = cv2.VideoCapture(vid_path)
 
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -113,7 +116,7 @@ for vid_path in os.listdir(BASE_PATH):
 
     while cap.isOpened():
         ret, frame2 = cap.read()
-        if not ret:
+        if not ret or frame_idx >= fps * STOP_SEC:
             break
 
         fg_mask = backSub.apply(frame2)
@@ -204,18 +207,22 @@ for vid_path in os.listdir(BASE_PATH):
     cv2.destroyAllWindows()
 
     sorted_ids = sorted(all_obj_ids)
+    sorted_fly_ids = [f'ID_{i}' for i in sorted_ids]
     total_frames = frame_idx  # 0 .. frame_idx-1
 
-    with open(csv_path, mode='w', newline='') as csv_file: # reformat this to match watershed_pathing format
-        csv_writer = csv.writer(csv_file)
-        csv_writer.writerow(['frame'] + [f'ID_{i}' for i in sorted_ids])
+    with open(csv_path, 'w', newline='') as csvfile:
+        fieldnames = ['frame'] + sorted_fly_ids
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
         for f in range(total_frames):
             detections = frame_data.get(f, {})
-            row = [f]
+            row = {'frame': f}
             for obj_id in sorted_ids:
                 if obj_id in detections:
                     cx, cy = detections[obj_id]
-                    row.append(f'({cx},{cy})')
+                    row[f'ID_{obj_id}'] = f'({cx}!{cy})'
                 else:
-                    row.append('')
-            csv_writer.writerow(row)
+                    row[f'ID_{obj_id}'] = ''
+            writer.writerow(row)
+
+    print(f"Total unique fly IDs tracked: {len(sorted_fly_ids)}")

@@ -63,7 +63,7 @@ RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2 # same as walking for on-ground reco
 
 FLYING_SPEED_THRESHOLD = 15 # px/frame speed they gotta go to be flying
 
-STOP_SEC = 2 # seconds of video to process per clip
+STOP_SEC = 60 # seconds of video to process per clip
 
 LOWER_BROWN = np.array([70, 70, 70]) # loosen constraints by a LOT
 UPPER_BROWN = np.array([200, 200, 200]) # dont need inner ROI anymore
