@@ -1,0 +1,4 @@
+video,algorithm,frames_processed,unique_ids,avg_id_length_frames,avg_id_length_sec,avg_flies_per_frame
+fb1.mov,orb,7140,12,4750.67,39.922,7.98
+fb2.mov,orb,7140,27,1556.7,13.082,5.89
+ALL_AVG,orb,7140.0,19.5,3153.68,26.502,6.94
