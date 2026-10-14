@@ -1,3 +1,5 @@
+## works for C types kinda but still not that good
+
 '''
 w/ Hungarian Matching, velocity prediction, and new flight handling
 --------------------------------------------------
@@ -61,7 +63,7 @@ RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2 # same as walking for on-ground reco
 
 FLYING_SPEED_THRESHOLD = 15 # px/frame speed they gotta go to be flying
 
-STOP_SEC = 300 # seconds of video to process per clip
+STOP_SEC = 2 # seconds of video to process per clip
 
 LOWER_BROWN = np.array([70, 70, 70]) # loosen constraints by a LOT
 UPPER_BROWN = np.array([200, 200, 200]) # dont need inner ROI anymore
@@ -190,10 +192,10 @@ def get_fg_mask(frame, name):
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (53, 53))
         arena_mask = cv2.erode(arena_mask, kernel, iterations=1)
 
-    # _, fly_mask = cv2.threshold(gray, 185, 255, cv2.THRESH_BINARY_INV)
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    fly_mask = cv2.inRange(rgb, LOWER_BROWN, UPPER_BROWN)
-    fly_mask = cv2.bitwise_and(fly_mask, arena_mask)
+    _, fly_mask = cv2.threshold(gray, 185, 255, cv2.THRESH_BINARY_INV)
+    #rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    #fly_mask = cv2.inRange(rgb, LOWER_BROWN, UPPER_BROWN)
+    #fly_mask = cv2.bitwise_and(fly_mask, arena_mask)
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     fly_mask = cv2.morphologyEx(fly_mask, cv2.MORPH_OPEN, kernel, iterations=1)
