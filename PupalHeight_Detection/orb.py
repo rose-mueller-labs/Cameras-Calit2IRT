@@ -4,6 +4,10 @@ ORB -> watershed -> velocity prediction -> Hungarian matching fly tracker
 pipeline:
   0. Darkness gate: flies are a bit darker than their *local* background, so a black-hat transform
      (closing - gray) lights up small dark things and ignores big/flat areas. ORB only looks near those.
+  0b. Wall zone (walls + EDGE_BAND px of floor next to them): flies walking on the walls are NOT on the bright floor, and the walls themselves have tons of edges/texture.
+     But the walls never move, so a per-pixel bright-percentile background (frames sampled across the clip) is subtracted there:
+     anything darker than that background in the zone = a fly. Static smudges/shadows near the walls cancel out.
+     (Deep interior, further than EDGE_BAND from the walls, still uses the black-hat above.)
   1. ORB keypoints are detected on every frame (restricted to the arena AND the dark gate, so walls/box edges don't count).
      ORB = FAST corners + descriptors, so on a fly the keypoints land on the body outline / legs / wings.
   2. Keypoints are stamped as filled circles and morphologically closed so the clusters on each fly
@@ -17,6 +21,9 @@ things to tune first (in order):
 - KP_RADIUS / KP_CLOSE_KERNEL: controls how far apart keypoints can be and still merge into one fly
 - MIN/MAX_CONTOUR_AREA: look at the debug png's to pick these
 - DARK_THRESH: gray levels darker than the local bg that count as "fly". Raise if walls/shadows leak in, lower if faint flies vanish
+- BG_SHIFT_TOL: raise (9-11) if static wall stuff still flickers on/off, lower if flies right on a wall line get shaved
+- EDGE_BAND: if smudges/shadows next to the walls still get boxed, raise it. If the black-hat deep interior is too small, lower it
+- EDGE_DARK_THRESH: same idea as DARK_THRESH but for the wall ring (bg-subtraction). Raise if wall texture/camera jitter leaks in
 - DARK_KERNEL: must be bigger than a fly (px) and smaller than anything you want ignored as 'background'
 --------------------------------------------------
 https://docs.opencv.org/4.x/d1/d89/tutorial_py_orb.html
@@ -58,7 +65,7 @@ RECOVERY_THRESHOLD = DISTANCE_THRESHOLD * 2 # same as walking for on-ground reco
 
 FLYING_SPEED_THRESHOLD = 15 # px/frame speed they gotta go to be flying
 
-STOP_SEC = 60 # seconds of video to process per clip
+STOP_SEC = 300 # seconds of video to process per clip
 
 # ORB params
 ORB_N_FEATURES = 3000 # max keypoints per frame
@@ -78,6 +85,13 @@ USE_DARK_GATE = True # flies are a lil darker than the bg: only let ORB look nea
 DARK_KERNEL = 61 # black-hat window (px); bigger than a fly, so a fly counts as 'small dark thing' but a wall/shadow band doesnt
 DARK_THRESH = 15 # gray levels darker than the local bg to count as fly
 DARK_GATE_DILATE = 15 # how far around each dark spot ORB is allowed to look (px)
+
+USE_EDGE_BG = True # flies walking along the walls: subtract a static bg (walls are static, flies move) in the wall ring
+BG_SAMPLES = 30 # frames sampled evenly across the clip for the bg (more = better at ignoring flies that sit still a while)
+BG_PERCENTILE = 75 # flies are always DARKER than the wall, so use a bright percentile (50 = plain median). 75 means a fly can sit in one spot for up to ~75% of the samples and still not get absorbed into the bg
+BG_SHIFT_TOL = 7 # px: bg is min-filtered by this much so a static smudge that wobbles a pixel or two (camera vibration / compression) still cancels out
+EDGE_BAND = 60 # px: the zone along the walls (walls + this much of the floor next to them, on top of ARENA_ERODE) uses bg-subtraction ONLY. Smudges/shadows/scratches near the walls are static so they cancel; the black-hat only runs deeper inside
+EDGE_DARK_THRESH = 25 # gray levels darker than the static bg for a wall px to count as fly (higher than DARK_THRESH, wall texture jitters a bit)
 
 SPLIT_TOUCHING = True # distance transform seeds so two flies brushing by dont become one big fly
 SEED_WINDOW = 31 # roughly one fly wide (px)
@@ -212,6 +226,33 @@ orb = cv2.ORB_create(
 )
 
 
+background = None # per-video median bg (gray, blurred), set in the main loop
+
+
+def build_background(cap, n_frames):
+    """
+    Per-pixel bright-percentile of BG_SAMPLES frames spread across the first n_frames.
+    Static stuff (walls, box edges, scratches) survives it. A fly only gets absorbed into the bg if it sat on the same px for more than BG_PERCENTILE% of the samples.
+    """
+    idxs = np.linspace(0, max(n_frames - 1, 0), BG_SAMPLES).astype(int)
+    stack = []
+    for i in idxs:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(i))
+        ret, f = cap.read()
+        if not ret:
+            continue
+        g = cv2.GaussianBlur(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY), (5, 5), 0)
+        stack.append(g)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # rewind so the tracker starts on frame 0
+    if len(stack) < 3:
+        return None
+    stack = np.stack(stack)
+    k = int(round(BG_PERCENTILE / 100 * (len(stack) - 1)))
+    bg = np.partition(stack, k, axis=0)[k] # k-th brightest-ish value per px, stays uint8 so no giant float copy
+    # shift tolerance: a px only counts as 'darker than bg' if its darker than the darkest bg px within BG_SHIFT_TOL
+    return cv2.erode(bg, cv2.getStructuringElement(cv2.MORPH_RECT, (BG_SHIFT_TOL, BG_SHIFT_TOL)))
+
+
 def get_arena_mask(gray):
     """Biggest bright region = the arena. Eroded so the box walls dont make keypoints."""
     thresh = ARENA_THRESH if ARENA_THRESH is not None else float(np.median(gray)) - ARENA_MARGIN
@@ -237,7 +278,21 @@ def get_dark_mask(gray, arena_mask):
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (DARK_KERNEL, DARK_KERNEL)) # rect is way faster than ellipse here
     blackhat = cv2.morphologyEx(blur, cv2.MORPH_BLACKHAT, kernel)
     _, dark_mask = cv2.threshold(blackhat, DARK_THRESH, 255, cv2.THRESH_BINARY)
-    dark_mask = cv2.bitwise_and(dark_mask, arena_mask)
+    use_bg = USE_EDGE_BG and background is not None and background.shape == gray.shape
+    if use_bg:
+        # deep interior only: pull the arena in by another EDGE_BAND so anything near the walls is judged by the static bg instead
+        band = cv2.getStructuringElement(cv2.MORPH_RECT, (2 * EDGE_BAND + 1, 2 * EDGE_BAND + 1)) # kernel = 2r+1 so EDGE_BAND really is the band width
+        core_mask = cv2.erode(arena_mask, band, iterations=1)
+        dark_mask = cv2.bitwise_and(dark_mask, core_mask)
+
+        # wall zone (everything NOT in the core): darker than the static bg = fly
+        diff = cv2.subtract(background, blur) # saturating, so only 'darker than bg' stays positive
+        _, edge_dark = cv2.threshold(diff, EDGE_DARK_THRESH, 255, cv2.THRESH_BINARY)
+        edge_dark = cv2.bitwise_and(edge_dark, cv2.bitwise_not(core_mask))
+        dark_mask = cv2.bitwise_or(dark_mask, edge_dark)
+    else:
+        dark_mask = cv2.bitwise_and(dark_mask, arena_mask)
+
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     dark_mask = cv2.morphologyEx(dark_mask, cv2.MORPH_OPEN, k, iterations=1)
     return dark_mask
@@ -282,6 +337,10 @@ def get_fg_mask(frame, name):
     arena_mask = get_arena_mask(gray)
 
     dark_mask = get_dark_mask(gray, arena_mask)
+
+    # where a fly is allowed to be: the arena, or the whole frame when the wall ring is covered by the bg model
+    if USE_EDGE_BG and background is not None:
+        arena_mask = np.full_like(gray, 255)
     search_mask = arena_mask
     if USE_DARK_GATE:
         gate = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (DARK_GATE_DILATE, DARK_GATE_DILATE))
@@ -437,8 +496,8 @@ DEBUG_LOC = "/Volumes/Crucial X9/Cameras-Calit2IRT/PupalHeight_Detection/Testing
 
 print(os.listdir(BASE_PATH))
 
-for vid_name in os.listdir(BASE_PATH):
-    skip_list = {'fb1.mov', 'fb2.mov'}
+for vid_name in ['fm2.mov']: # os.listdir(BASE_PATH):
+    skip_list = {}
 
     if vid_name[0] == '.' or vid_name in skip_list:
         continue
@@ -477,6 +536,9 @@ for vid_name in os.listdir(BASE_PATH):
     if not cap.isOpened():
         print(f"Error opening {vid_path}")
         continue
+
+    # median bg for the wall ring (rewinds the video when done)
+    background = build_background(cap, min(total_frames, fps * STOP_SEC)) if USE_EDGE_BG else None
 
     # FRAME
     ret, frame = cap.read()

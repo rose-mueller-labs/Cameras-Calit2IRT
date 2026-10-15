@@ -28,7 +28,7 @@ os.makedirs(EVAL_LOC, exist_ok=True)
 FPS = 119 # only used to turn id length in frames into seconds
 MIN_ID_LEN = 1 # ignore ids seen in fewer than this many frames (applied to ALL algs so the compare is fair)
 
-VIDEOS = ['fb1.mov', 'fb2.mov']
+VIDEOS = ['fb1.mov', 'fm2.mov', 'fb2.mov', 'fb3.mov', 'fb4.mov', 'fm1.mov', 'fm3.mov', 'fm4.mov', 'ft1.mov', 'ft2.mov']
 
 # alg name -> csv suffix (the part after {video}_ in the filename)
 ALGS = {

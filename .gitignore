@@ -18,3 +18,4 @@ graphs.py
 graph.py
 CSVs
 *.mov
+.venv-1
