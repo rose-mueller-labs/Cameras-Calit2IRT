@@ -6,8 +6,8 @@ import pandas as pd
 from scipy.stats import ttest_ind, linregress, t
 
 EVAL_SUMMARY = "/Volumes/Crucial X9/Cameras-Calit2IRT/PupalHeight_Detection/TestingEval/eval_summary.csv"
-ALGORITHM = None            # set to a value from eval_summary's `algorithm` column to filter; None = use all rows
-MIN_ID_LENGTH_SEC = 40      # skip videos whose IDs switch in under this many seconds
+ALGORITHM = None # set to a value from eval_summary's `algorithm` column to filter; None = use all rows
+MIN_ID_LENGTH_SEC = 0 # skip videos whose IDs switch in under this many seconds, used to be 40 but I made it 0 now to see what happenes
 
 # CSV path per video
 TRACK_CSV = "/Volumes/Crucial X9/Cameras-Calit2IRT/PupalHeight_Detection/TestingOutput/{vid}_orb_watershed_velocity_hungarian_pathing.csv"
@@ -15,7 +15,7 @@ OUT_DIR = "/Volumes/Crucial X9/Cameras-Calit2IRT/PupalHeight_Detection/AnalysisO
 
 FPS = 119
 N_FLIES = 20
-CM_PER_PX = 10 / 1730
+CM_PER_PX = 10/1730 # idk this is based on calit2
 DURATION_SEC = 300
 BIN_SIZE = 5
 
@@ -47,7 +47,16 @@ def reg_ci(x, y, xgrid, alpha=0.05):
 
 
 def stars(p):
-    return "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else "ns"
+    if p < 0.001:
+        return "****"  
+    elif p < 0.01:
+        return "***"
+    elif p < 0.05:
+        return "**"
+    elif p < 0.10:
+       return "*" 
+    else:
+        return "ns"
 
 
 # pick videos from eval_summary
