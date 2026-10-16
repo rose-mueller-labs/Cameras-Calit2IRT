@@ -82,4 +82,4 @@ Here are the results in a tabular format from the five Blue videos (Each video h
 - **Watershed with thresholding** worked reasonably on `CO1d78` and `CO2d78` but detected almost no flies in `CO3d78`, `CO4d78` (0.01 per frame), and `CO5d78`. Its low ID counts in those videos reflect missed detections rather than good tracking.
 - These numbers measure tracking *continuity*, not accuracy.
 
-The five videos' results can be viewed [here](https://drive.proton.me/urls/Z5SHP3RHJC#4f84hwtt9fM6).
+The five Blue videos' results can be viewed [here](https://drive.proton.me/urls/Z5SHP3RHJC#4f84hwtt9fM6).
