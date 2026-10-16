@@ -17,17 +17,6 @@ pipeline:
   4. Tracking is the same as watershed_velocity_hungarian_pathing.py: Hungarian matching, EMA velocity,
      ghost positions for lost flies, ID-swap guard, and new-fly gate.
 --------------------------------------------------
-things to tune first (in order):
-- ORB_FAST_THRESHOLD / ORB_N_FEATURES: too few keypoints = flies missing, too many = bg noise
-- KP_RADIUS / KP_CLOSE_KERNEL: controls how far apart keypoints can be and still merge into one fly
-- MIN/MAX_CONTOUR_AREA: look at the debug png's to pick these
-- DARK_THRESH: gray levels darker than the local bg that count as "fly". Raise if walls/shadows leak in, lower if faint flies vanish
-- MAX_ASPECT: edge slivers are way longer than they are wide, flies arent. Lower it to be stricter, raise it if walking flies w legs get rejected
-- BG_SHIFT_TOL: raise (9-11) if static wall stuff still flickers on/off, lower if flies right on a wall line get shaved
-- EDGE_BAND: if smudges/shadows next to the walls still get boxed, raise it. If the black-hat deep interior is too small, lower it
-- EDGE_DARK_THRESH: same idea as DARK_THRESH but for the wall ring (bg-subtraction). Raise if wall texture/camera jitter leaks in
-- DARK_KERNEL: must be bigger than a fly (px) and smaller than anything you want ignored as 'background'
---------------------------------------------------
 https://docs.opencv.org/4.x/d1/d89/tutorial_py_orb.html
 https://www.geeksforgeeks.org/dsa/hungarian-algorithm-assignment-problem-set-1-introduction/
 https://cp-algorithms.com/graph/hungarian-algorithm.html
@@ -557,9 +546,11 @@ print(os.listdir(BASE_PATH))
 
 for vid_name in os.listdir(BASE_PATH):
 # what's left:
-# ft3.mov mb1.mov mb3.mov mm1.mov mm3.mov mt1.mov mt3.mov
-# ft4.mov mb2.mov mb4.mov mm2.mov mm4.mov mt2.mov mt4.mov
-    skip_list = {'fb1.mov', 'fb2.mov', 'fb3.mov', 'fb4.mov', 'fm1.mov', 'fm2.mov','fm3.mov', 'fm4.mov', 'ft1.mov', 'ft2.mov'}
+
+    skip_list = {'fb1.mov', 'fb2.mov', 'fb3.mov', 'fb4.mov', 'fm1.mov', 'fm2.mov',
+                 'fm3.mov', 'fm4.mov', 'ft1.mov', 'ft2.mov', 'ft3.mov', 'ft4.mov', 
+                 'mb1.mov', 'mb3.mov', 'mb4.mov', 'mm1.mov', 'mm2.mov', 'mm3.mov', 
+                 'mm4.mov', 'mt1.mov', 'mt2.mov', 'mt3.mov', 'mt4.mov'}
 
     if vid_name[0] == '.' or vid_name in skip_list:
         continue
@@ -642,7 +633,7 @@ for vid_name in os.listdir(BASE_PATH):
         large_contours, disp_frm, fg_mask, bg_mask, kp, kp_blobs, dark_mask = segment_frame(frame2, name)
 
         if DEBUG:
-            # kps drawn on the frame so you can see exactly what ORB is picking up
+            # kps drawn on the frame so we can see exactly what ORB is picking up
             kp_img = cv2.drawKeypoints(frame2, kp, None, color=(0, 255, 0), flags=0)
             cv2.imwrite(f"{DEBUG_LOC}/{name}_orb_keypoints.png", kp_img)
             cv2.imwrite(f"{DEBUG_LOC}/{name}_orb_kp_blobs.png", kp_blobs)
