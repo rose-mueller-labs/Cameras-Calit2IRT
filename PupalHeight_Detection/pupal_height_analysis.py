@@ -31,6 +31,12 @@ COLOR_A, COLOR_B = "deeppink", "steelblue"
 TREATMENT_GROUPS = {"t": ("ft", "mt"), "m": ("fm", "mm"), "b": ("fb", "mb")}
 TREATMENT_COLORS = {"t": "darkgoldenrod", "m": "maroon", "b": "seagreen"}
 
+SEX_PLOTS = {"female": ("ft", "fm", "fb"), "male": ("mt", "mm", "mb"),}
+
+# color each prefix by its treatment (t, m, b = second letter of the prefix)
+PREFIX_COLORS = {pre: TREATMENT_COLORS[pre[1]] for pres in SEX_PLOTS.values() for pre in pres}
+
+
 
 def parse_coord(s):
     try:
@@ -71,7 +77,7 @@ def stars(p):
 
 
 def plot_speed_fit(ax, groups, vids, colors):
-    """Scatter of binned avg speed + piecewise linear fits (0-100, 100-200, 200-300 s) with CI."""
+    """Scatter of binned -> avg speed + piecewise linear fits (0-100, 100-200, 200-300 s) with CI."""
     for g in groups:
         c = colors[g]
         mat = np.array([vid_bin_means[v] for v in vids[g]])
@@ -100,6 +106,66 @@ def plot_speed_fit(ax, groups, vids, colors):
                     label=f"{g}, {lo}-{hi}s: {eq}, p = {p_fit}")
             ax.fill_between(xgrid, ci_lo, ci_hi, color="gray", alpha=0.22)
 
+
+def bin_speed(s_arr, sp_arr, bin_size=1, duration=DURATION_SEC):
+    """Mean speed per bin for one video. Returns (bin_centers, means)."""
+    edges = np.arange(0, duration + bin_size, bin_size)
+    centers = edges[:-1] + bin_size / 2
+    means = np.full(len(centers), np.nan)
+    idx = np.digitize(s_arr, edges) - 1  # bin index for each frame
+    for i in range(len(centers)):
+        vals = sp_arr[idx == i]
+        vals = vals[~np.isnan(vals)]
+        if len(vals) > 0:
+            means[i] = vals.mean()
+    return centers, means
+
+
+def plot_speed_individual(ax, groups, vids, colors, bin_size=1, fit=False, show_group_mean=False):
+    """One trace per video (mean speed in each `bin_size`-second bin).
+    fit=True adds a piecewise linear fit (0-100, 100-200, 200-300 s) for each video.
+    show_group_mean=True overlays a thick line of the per-group mean."""
+    for g in groups:
+        c = colors[g]
+        all_means = []
+        for k, v in enumerate(vids[g]):
+            s_arr, sp_arr = speed_info_per_vid[v]
+            x, y = bin_speed(s_arr, sp_arr, bin_size)
+            all_means.append(y)
+            ax.scatter(x, y, color=c, label=f"{g} videos (n={len(vids[g])})" if k == 0 else None)
+
+            if fit:
+                valid = ~np.isnan(y)
+                x_v, y_v = x[valid], y[valid]
+                for lo, hi in [(0, 100), (100, 200), (200, DURATION_SEC)]:
+                    m = (x_v >= lo) & (x_v <= hi)
+                    if m.sum() < 3:
+                        continue
+                    slope, intercept, *_ = linregress(x_v[m], y_v[m])
+                    xs = np.array([x_v[m].min(), x_v[m].max()])
+                    ax.plot(xs, slope * xs + intercept, color=c, lw=1.2, alpha=0.7)
+
+        if show_group_mean and all_means:
+            ax.plot(x, np.nanmean(np.array(all_means), axis=0), color=c, lw=2.5, label=f"{g} mean")
+
+def plot_speed_by_sex(ax, g, vids, bin_size=1, show_mean=False):
+    """Per-video traces for treatment group g, colored by sex, 
+    Female = first prefix in TREATMENT_GROUPS[g], male = second."""
+    f_pre, m_pre = TREATMENT_GROUPS[g]
+    sex_info = [("female", f_pre, COLOR_A), ("male", m_pre, COLOR_B)]
+
+    for label, pre, c in sex_info:
+        sex_vids = [v for v in vids[g] if in_group(v, pre)]
+        all_means = []
+        x = None
+        for k, v in enumerate(sex_vids):
+            s_arr, sp_arr = speed_info_per_vid[v]
+            x, y = bin_speed(s_arr, sp_arr, bin_size)
+            all_means.append(y)
+            ax.scatter(x, y, color=c, label=f"{label} videos (n={len(sex_vids)})" if k == 0 else None)
+
+        if show_mean and all_means:
+            ax.plot(x, np.nanmean(np.array(all_means), axis=0), color=c, lw=2.5, label=f"{label} mean")
 
 # pick videos from eval_summary
 # columns: video,algorithm,frames_processed,unique_ids,avg_id_length_frames,avg_id_length_sec,avg_flies_per_frame
@@ -276,6 +342,19 @@ for ga, gb in PAIRS:
     fig.savefig(f"{OUT_DIR}/{ga}_vs_{gb}_speed_fit.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
+    # each video's own avg speed per second
+    fig, ax = plt.subplots(figsize=(11, 8))
+    fig.suptitle(f"Per-Video Activity Over Time ({ga} vs {gb})", fontsize=20)
+    ax.axvline(60, c='r', label='Baseline')
+    plot_speed_individual(ax, (ga, gb), vids, colors, bin_size=1, fit=False)
+    ax.legend(fontsize=10, loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0)
+    ax.set_xlabel("Time (s)", fontsize=18)
+    ax.set_ylabel("Avg Speed (cm/s)", fontsize=18)
+    ax.tick_params(axis="both", labelsize=14)
+    fig.tight_layout()
+    fig.savefig(f"{OUT_DIR}/{ga}_vs_{gb}_speed_individual.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
 # side-by-side speed_fit for t, m, b on a common x/y scale, with a line at 60 s
 available = []
 missing = []
@@ -378,8 +457,7 @@ else:
     plt.close(fig)
 
     # avg speed over time, one panel per pooled group, same x/y scale (60 s baseline marked)
-    fig, axes = plt.subplots(1, len(names), figsize=(8 * len(names), 8),
-                             sharex=True, sharey=True, squeeze=False)
+    fig, axes = plt.subplots(1, len(names), figsize=(8 * len(names), 8), sharex=True, sharey=True, squeeze=False)
     axes = axes[0]
     fig.suptitle("Average Activity Over Time (t vs m vs b)", fontsize=20)
     for ax, g in zip(axes, names):
@@ -392,4 +470,42 @@ else:
     axes[0].set_ylabel("Avg Speed (cm/s)", fontsize=16)
     fig.tight_layout()
     fig.savefig(f"{OUT_DIR}/t_vs_m_vs_b_speed_fit.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+    # treatment group individual stuff
+    fig, axes = plt.subplots(1, len(names), figsize=(8 * len(names), 8), sharex=True, sharey=True, squeeze=False)
+    axes = axes[0]
+    fig.suptitle("Per-Video Activity Over Time (t vs m vs b)", fontsize=20)
+    for ax, g in zip(axes, names):
+        ax.axvline(60, c='r', ls='--', lw=1.5)
+        plot_speed_by_sex(ax, g, tm_vids)
+        ax.set_title(f"{g} (n = {len(tm_vids[g])} videos)", fontsize=16)
+        ax.set_xlabel("Time (s)", fontsize=16)
+        ax.set_ylim(top=0.8)
+        ax.tick_params(axis="both", labelsize=12)
+        ax.legend(fontsize=9, loc="upper center", bbox_to_anchor=(0.5, -0.12))
+    axes[0].set_ylabel("Avg Speed (cm/s)", fontsize=16)
+    fig.tight_layout()
+    fig.savefig(f"{OUT_DIR}/t_vs_m_vs_b_speed_individual_by_sex.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+# co plots the sexes on one graph's individual activity
+for sex, prefixes in SEX_PLOTS.items():
+    sex_vids = {pre: [v for v in test_names if in_group(v, pre)] for pre in prefixes}
+    present = tuple(pre for pre in prefixes if len(sex_vids[pre]) > 0)
+    if not present:
+        print(f"{sex} individual co-plot: no videos found, skipping")
+        continue
+
+    fig, ax = plt.subplots(figsize=(11, 8))
+    fig.suptitle(f"Per-Video Activity Over Time ({', '.join(present)})", fontsize=20)
+    ax.axvline(60, c='r', ls='--', lw=1.5, label='Baseline')
+    plot_speed_individual(ax, present, sex_vids, PREFIX_COLORS, bin_size=1)
+    ax.legend(fontsize=10, loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0)
+    ax.set_xlabel("Time (s)", fontsize=18)
+    ax.set_ylabel("Avg Speed (cm/s)", fontsize=18)
+    ax.set_ylim(0.1, 0.8)
+    ax.tick_params(axis="both", labelsize=14)
+    fig.tight_layout()
+    fig.savefig(f"{OUT_DIR}/{'_'.join(present)}_speed_individual.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
