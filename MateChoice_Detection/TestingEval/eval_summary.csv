@@ -1,0 +1,3 @@
+video,algorithm,frames_processed,unique_ids,avg_id_length_frames,avg_id_length_sec,avg_flies_per_frame
+CROPPED_matechoice-ACO1-test2.mp4,highpass,4350,14,727.07,6.11,2.34
+ALL_AVG,highpass,4350.0,14.0,727.07,6.11,2.34
